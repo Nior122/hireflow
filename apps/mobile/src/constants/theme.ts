@@ -1,0 +1,70 @@
+export const Colors = {
+  light: {
+    primary: "#2563eb",
+    primaryDark: "#1d4ed8",
+    background: "#ffffff",
+    surface: "#f8fafc",
+    surfaceElevated: "#ffffff",
+    text: "#0f172a",
+    textSecondary: "#64748b",
+    textTertiary: "#94a3b8",
+    border: "#e2e8f0",
+    borderLight: "#f1f5f9",
+    error: "#ef4444",
+    success: "#10b981",
+    warning: "#f59e0b",
+    info: "#3b82f6",
+    card: "#ffffff",
+    overlay: "rgba(0,0,0,0.5)",
+    skeleton: "#e2e8f0",
+    gradient: ["#2563eb", "#1d4ed8"] as [string, string],
+  },
+  dark: {
+    primary: "#3b82f6",
+    primaryDark: "#2563eb",
+    background: "#0f172a",
+    surface: "#1e293b",
+    surfaceElevated: "#1e293b",
+    text: "#f1f5f9",
+    textSecondary: "#94a3b8",
+    textTertiary: "#64748b",
+    border: "#334155",
+    borderLight: "#1e293b",
+    error: "#f87171",
+    success: "#34d399",
+    warning: "#fbbf24",
+    info: "#60a5fa",
+    card: "#1e293b",
+    overlay: "rgba(0,0,0,0.7)",
+    skeleton: "#334155",
+    gradient: ["#3b82f6", "#2563eb"] as [string, string],
+  },
+};
+
+export const Spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  "2xl": 24,
+  "3xl": 32,
+};
+
+export const FontSize = {
+  xs: 12,
+  sm: 14,
+  md: 16,
+  lg: 18,
+  xl: 22,
+  "2xl": 28,
+  "3xl": 34,
+};
+
+export const BorderRadius = {
+  sm: 6,
+  md: 10,
+  lg: 14,
+  xl: 18,
+  full: 9999,
+};
