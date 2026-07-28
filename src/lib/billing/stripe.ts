@@ -30,7 +30,7 @@ export async function createStripePortal(userId: string) {
   return { url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing` };
 }
 
-export async function handleStripeWebhook(event: string, data: any) {
+export async function handleStripeWebhook(event: string, data: Record<string, unknown>) {
   // In production, verify webhook signature, then handle:
   // checkout.session.completed → create/update subscription
   // customer.subscription.updated → update subscription status

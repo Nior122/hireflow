@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
 
   const { page, limit, offset } = paginateParams(req);
   const status = req.nextUrl.searchParams.get("status");
-  const where: any = { employerId: auth.userId };
+  const where: { employerId: string; status?: string } = { employerId: auth.userId! };
   if (status) where.status = status;
 
   const [data, total] = await Promise.all([

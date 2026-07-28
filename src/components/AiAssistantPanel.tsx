@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Sparkles, Loader2, Wand2, Pencil, GrammarCheck, Search, ArrowUp } from "lucide-react";
+import { Sparkles, Loader2, Wand2, Pencil, Search, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ const AI_ACTIONS = [
   { id: "improve_summary", label: "Improve Summary", icon: Wand2, description: "Make your summary more impactful" },
   { id: "rewrite_bullets", label: "Rewrite Bullets", icon: Pencil, description: "Strengthen achievement bullets" },
   { id: "generate_achievements", label: "Generate Achievements", icon: ArrowUp, description: "Create quantified achievement bullets" },
-  { id: "fix_grammar", label: "Fix Grammar", icon: GrammarCheck, description: "Correct errors and improve clarity" },
+  { id: "fix_grammar", label: "Fix Grammar", icon: Pencil, description: "Correct errors and improve clarity" },
   { id: "ats_keywords", label: "ATS Keywords", icon: Search, description: "Extract and suggest keywords" },
 ];
 

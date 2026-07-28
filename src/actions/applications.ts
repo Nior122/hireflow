@@ -85,10 +85,10 @@ export async function moveApplication(id: string, newStatus: ApplicationStatus, 
 
     if (app.status === newStatus) {
       const columnApps = await prisma.jobApplication.findMany({ where: { userId: user.id, status: newStatus }, orderBy: { position: "asc" } });
-      const reordered = columnApps.filter(a => a.id !== id);
+      const reordered = columnApps.filter((a: { id: string }) => a.id !== id);
       const clampedPosition = Math.min(newPosition, reordered.length);
       reordered.splice(clampedPosition, 0, app);
-      await prisma.$transaction(reordered.map((a, index) => prisma.jobApplication.update({ where: { id: a.id }, data: { position: index } })));
+      await prisma.$transaction(reordered.map((a: { id: string }, index: number) => prisma.jobApplication.update({ where: { id: a.id }, data: { position: index } })));
     } else {
       // Wrap cross-column move in a transaction to ensure atomicity
       await prisma.$transaction([

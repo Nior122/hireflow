@@ -50,12 +50,18 @@ export async function getCandidateIntelligence(orgId?: string): Promise<ActionRe
 
     // Skills distribution
     const skillCount: Record<string, number> = {};
-    scores.forEach(c => (c.keySkills ?? []).forEach(s => { skillCount[s] = (skillCount[s] ?? 0) + 1; }));
+    scores.forEach((c: Record<string, unknown>) => {
+      const skills = c.keySkills as string[];
+      if (skills) skills.forEach((s: string) => { skillCount[s] = (skillCount[s] ?? 0) + 1; });
+    });
     const topSkills = Object.entries(skillCount).sort((a, b) => b[1] - a[1]).slice(0, 15);
 
     // Status distribution
     const statusDist: Record<string, number> = {};
-    scores.forEach(c => { statusDist[c.status] = (statusDist[c.status] ?? 0) + 1; });
+    scores.forEach((c: Record<string, unknown>) => {
+      const status = c.status as string;
+      statusDist[status] = (statusDist[status] ?? 0) + 1;
+    });
 
     return { success: true, data: { scores, topSkills, statusDist, total: scores.length } };
   } catch { return { success: false, error: "Failed" }; }
@@ -126,7 +132,7 @@ export async function generateReport(orgId?: string): Promise<ActionResponse<str
   } catch { return { success: false, error: "Failed" }; }
 }
 
-function generateTextReport(metrics: any, funnel: any[], sources: any[], insights: any[]): string {
+function generateTextReport(metrics: { totalApplications: number; totalHires: number; offerAcceptanceRate: number; avgTimeToHire: number; pipelineVelocity: number }, funnel: { stage: string; count: number; conversion: number }[], sources: { source: string; applications: number; hires: number; conversion: number }[], insights: { title: string; description: string; confidence: number }[]): string {
   return `# Quarterly Hiring Report
 
 ## Executive Summary

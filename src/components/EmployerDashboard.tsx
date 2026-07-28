@@ -1,20 +1,19 @@
 'use client';
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { Users, Inbox, UserCog } from "lucide-react";
-import { EmailTemplateEditor } from "./EmailTemplateEditor";
-import { ExportButton } from "./ExportButton";
-import { AddCandidateDialog } from "./AddCandidateDialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getCandidates } from "@/actions/candidates";
 import type { CandidateCard } from "@/lib/types";
 
-const CandidatePipeline = dynamic(() => import("./CandidatePipeline").then(m => ({ default: m.CandidatePipeline })), { loading: () => <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">{Array.from({length:6}).map((_,i)=><div key={i} className="h-48 bg-muted rounded-xl animate-pulse"/>)}</div> });
-const EmailDigestPanel = dynamic(() => import("./EmailDigestPanel").then(m => ({ default: m.EmailDigestPanel })), { loading: () => <Skeleton className="h-32 rounded-xl" /> });
-const TeamDashboard = dynamic(() => import("./TeamDashboard").then(m => ({ default: m.TeamDashboard })), { loading: () => <Skeleton className="h-64 rounded-xl" /> });
+const EmailTemplateEditor = dynamic(() => import("./EmailTemplateEditor").then(m => ({ default: m.EmailTemplateEditor })), { ssr: false });
+const ExportButton = dynamic(() => import("./ExportButton").then(m => ({ default: m.ExportButton })), { ssr: false });
+const AddCandidateDialog = dynamic(() => import("./AddCandidateDialog").then(m => ({ default: m.AddCandidateDialog })), { ssr: false });
+const CandidatePipeline = dynamic(() => import("./CandidatePipeline").then(m => ({ default: m.CandidatePipeline })), { loading: () => <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">{Array.from({length:6}).map((_,i)=><div key={i} className="h-48 bg-muted rounded-xl animate-pulse"/>)}</div>, ssr: false });
+const EmailDigestPanel = dynamic(() => import("./EmailDigestPanel").then(m => ({ default: m.EmailDigestPanel })), { loading: () => <Skeleton className="h-32 rounded-xl" />, ssr: false });
+const TeamDashboard = dynamic(() => import("./TeamDashboard").then(m => ({ default: m.TeamDashboard })), { loading: () => <Skeleton className="h-64 rounded-xl" />, ssr: false });
 
 interface Props { userId: string; }
 
@@ -25,15 +24,19 @@ export function EmployerDashboard({ userId }: Props) {
   const [tab, setTab] = useState<"pipeline" | "team">("pipeline");
 
   useEffect(() => {
-    getCandidates().then(r => {
-      setCandidates(r.success ? r.data : []);
-      setLoading(false);
+    import("@/actions/candidates").then(({ getCandidates }) => {
+      getCandidates().then(r => {
+        setCandidates(r.success ? r.data : []);
+        setLoading(false);
+      });
     });
   }, []);
 
   function refreshCandidates() {
-    getCandidates().then(r => {
-      setCandidates(r.success ? r.data : []);
+    import("@/actions/candidates").then(({ getCandidates }) => {
+      getCandidates().then(r => {
+        setCandidates(r.success ? r.data : []);
+      });
     });
   }
 

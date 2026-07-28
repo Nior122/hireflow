@@ -53,7 +53,7 @@ export async function seedSampleData(): Promise<{ success: boolean; error?: stri
       const count = statusCounts[job.status] ?? 0;
       statusCounts[job.status] = count + 1;
       const createdAt = subDays(new Date(), Math.floor(Math.random() * 30) + 1);
-      return { company: job.company, role: job.role, link: job.link, notes: job.notes, status: job.status as any, source: job.source, position: count, userId: user.id, createdAt, updatedAt: createdAt };
+      return { company: job.company, role: job.role, link: job.link, notes: job.notes, status: job.status as "UNAPPLIED" | "WISHLIST" | "APPLIED" | "INTERVIEW" | "OFFER" | "REJECTED", source: job.source, position: count, userId: user.id, createdAt, updatedAt: createdAt };
     });
 
     await prisma.jobApplication.createMany({ data });

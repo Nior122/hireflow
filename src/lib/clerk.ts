@@ -1,7 +1,8 @@
-import { currentUser } from "@clerk/nextjs/server";
-import { prisma } from "./prisma";
+'use server';
 
 export async function createOrGetUser() {
+  const { currentUser } = await import("@clerk/nextjs/server");
+  const { prisma } = await import("./prisma");
   const clerkUser = await currentUser();
   if (!clerkUser) throw new Error("Not authenticated");
 

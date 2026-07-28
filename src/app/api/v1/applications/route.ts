@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const status = req.nextUrl.searchParams.get("status");
   const search = req.nextUrl.searchParams.get("search");
 
-  const where: any = { userId: auth.userId };
+  const where: { userId: string; status?: string; OR?: Array<{ company?: { contains: string; mode: string }; role?: { contains: string; mode: string } }> } = { userId: auth.userId! };
   if (status) where.status = status;
   if (search) where.OR = [{ company: { contains: search, mode: "insensitive" } }, { role: { contains: search, mode: "insensitive" } }];
 

@@ -31,7 +31,7 @@ export async function createInterview(data: {
         userId: user.id,
         company: data.company,
         position: data.position,
-        interviewType: (data.interviewType as any) ?? "TECHNICAL",
+        interviewType: (data.interviewType as "PHONE_SCREEN" | "TECHNICAL" | "HR" | "BEHAVIORAL" | "SYSTEM_DESIGN" | "PAIR_PROGRAMMING" | "MANAGER_ROUND" | "EXECUTIVE" | "FINAL_ROUND" | "ASSESSMENT") ?? "TECHNICAL",
         interviewRound: data.interviewRound ?? 1,
         scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
         duration: data.duration ?? 60,
@@ -56,7 +56,7 @@ export async function updateInterview(id: string, data: {
     const user = await createOrGetUser();
     const existing = await prisma.interview.findFirst({ where: { id, userId: user.id } });
     if (!existing) return { success: false, error: "Interview not found" };
-    const update: any = {};
+    const update: { status?: string; notes?: string; scheduledAt?: Date; location?: string; meetingLink?: string; interviewerName?: string } = {};
     if (data.status) update.status = data.status;
     if (data.notes) update.notes = data.notes;
     if (data.scheduledAt) update.scheduledAt = new Date(data.scheduledAt);
@@ -129,7 +129,7 @@ export async function getInterviewNotes(interviewId: string): Promise<ActionResp
 export async function saveInterviewNote(interviewId: string, data: { type: string; title: string; content: string }): Promise<ActionResponse<any>> {
   try {
     const note = await prisma.interviewNote.upsert({
-      where: { interviewId_type_title: { interviewId, type: data.type, title: data.title } } as any,
+      where: { interviewId_type_title: { interviewId, type: data.type, title: data.title } },
       update: { content: data.content },
       create: { interviewId, type: data.type, title: data.title, content: data.content },
     });
@@ -157,10 +157,10 @@ export async function getInterviewAnalytics(): Promise<ActionResponse<{
     ]);
 
     const byType: Record<string, number> = {};
-    interviews.forEach(i => { byType[i.interviewType] = (byType[i.interviewType] ?? 0) + 1; });
+    interviews.forEach((i: { interviewType: string }) => { byType[i.interviewType] = (byType[i.interviewType] ?? 0) + 1; });
 
     const byCategory: Record<string, number> = {};
-    practices.forEach(p => { byCategory[p.category] = (byCategory[p.category] ?? 0) + 1; });
+    practices.forEach((p: { category: string }) => { byCategory[p.category] = (byCategory[p.category] ?? 0) + 1; });
 
     const scores = practices.filter(p => p.score != null).map(p => p.score!);
     const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;

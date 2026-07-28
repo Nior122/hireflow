@@ -125,7 +125,7 @@ export async function scanInbox(): Promise<{ success: boolean; data?: GmailMessa
   } catch { return { success: false, error: "Failed to scan inbox" }; }
 }
 
-export async function classifyEmails(messages: GmailMessage[]): Promise<{ success: boolean; data?: Array<{ message: GmailMessage; classification: any }>; error?: string }> {
+export async function classifyEmails(messages: GmailMessage[]): Promise<{ success: boolean; data?: Array<{ message: GmailMessage; classification: { isJobRelated: boolean; type: string; summary: string; suggestedStatus: string; company?: string; role?: string } }>; error?: string }> {
   try {
     const results = [];
     for (const msg of messages) {
@@ -142,7 +142,7 @@ export async function classifyEmails(messages: GmailMessage[]): Promise<{ succes
 
 export async function importEmailAsApplication(
   message: GmailMessage,
-  classification: any
+  classification: { isJobRelated: boolean; type: string; summary: string; suggestedStatus: string; company?: string; role?: string }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const user = await createOrGetUser();

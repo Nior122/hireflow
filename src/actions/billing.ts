@@ -53,7 +53,7 @@ export async function trackUsage(feature: string, count: number = 1): Promise<Ac
     today.setHours(0, 0, 0, 0);
 
     await prisma.usageRecord.upsert({
-      where: { userId_feature_date: { userId: user.id, feature, date: today } } as any,
+      where: { userId_feature_date: { userId: user.id, feature, date: today } } as unknown as { userId_feature_date: { userId: string; feature: string; date: Date } },
       update: { count: { increment: count } },
       create: { userId: user.id, feature, count },
     }).catch(async () => {
@@ -79,7 +79,9 @@ export async function getUsage(): Promise<ActionResponse<any>> {
     });
 
     const byFeature: Record<string, number> = {};
-    usage.forEach(u => { byFeature[u.feature] = (byFeature[u.feature] ?? 0) + u.count; });
+    usage.forEach((u: { feature: string; count: number }) => {
+      byFeature[u.feature] = (byFeature[u.feature] ?? 0) + u.count;
+    });
 
     const usageWithLimits = Object.entries(plan.limits).map(([feature, limit]) => {
       const current = byFeature[feature] ?? 0;
@@ -98,7 +100,7 @@ export async function getFeatureFlags(): Promise<ActionResponse<Record<string, b
     await createOrGetUser();
     const flags = await prisma.featureFlag.findMany();
     const result: Record<string, boolean> = {};
-    flags.forEach(f => { result[f.name] = f.enabled; });
+    flags.forEach((f: { name: string; enabled: boolean }) => { result[f.name] = f.enabled; });
     return { success: true, data: result };
   } catch { return { success: false, error: "Failed" }; }
 }
@@ -240,7 +242,7 @@ export async function getAdminStats(): Promise<ActionResponse<any>> {
     ]);
 
     const planCounts: Record<string, number> = {};
-    subscriptions.forEach(s => { planCounts[s.plan] = s._count.plan; });
+    subscriptions.forEach((s: { plan: string; _count: { plan: number } }) => { planCounts[s.plan] = s._count.plan; });
 
     return {
       success: true,

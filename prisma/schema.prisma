@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  output   = "../src/generated"
 }
 
 datasource db {
@@ -40,11 +40,13 @@ model User {
   scorecards       CandidateScorecard[]
   assignedCandidates Candidate[]    @relation("AssignedToRecruiter")
   hiringManagerCandidates Candidate[] @relation("HiringManager")
-  managedJobPostings JobPosting[]
+  hiringManagerOnJobPostings JobPosting[] @relation("HiringManagerOnPosting")
+  managedJobPostings JobPosting[] @relation("ManagedJobPostings")
   interviewersOnJobs JobPosting[]  @relation("InterviewerOnJobs")
   subscription      Subscription?
   apiKeys           ApiKey[]
   usageRecords      UsageRecord[]
+  interviewPractices InterviewPractice[]
 }
 
 model Subscription {
@@ -64,8 +66,22 @@ model Subscription {
   updatedAt       DateTime  @updatedAt
 }
 
-enum PlanType { FREE PRO PREMIUM TEAM BUSINESS ENTERPRISE }
-enum SubStatus { ACTIVE PAST_DUE CANCELED EXPIRED TRIALING }
+enum PlanType {
+  FREE
+  PRO
+  PREMIUM
+  TEAM
+  BUSINESS
+  ENTERPRISE
+}
+
+enum SubStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+  TRIALING
+}
 
 model ApiKey {
   id          String     @id @default(cuid())
@@ -88,6 +104,7 @@ model Webhook {
   events         String[]
   enabled        Boolean  @default(true)
   createdAt      DateTime @default(now())
+  webhookEvents  WebhookEvent[]
 }
 
 model WebhookEvent {
@@ -165,6 +182,7 @@ model Organization {
   invitations OrganizationInvitation[]
   jobPostings JobPosting[]
   auditLogs   AuditLog[]
+  setting     OrganizationSetting?
 }
 
 model OrganizationMember {
@@ -190,6 +208,7 @@ model OrganizationInvitation {
   email           String
   role            OrgMemberRole @default(VIEWER)
   token           String   @unique
+  invitedBy       User?    @relation(fields: [invitedById], references: [id], onDelete: SetNull)
   invitedById     String?
   expiresAt       DateTime
   acceptedAt      DateTime?
@@ -219,11 +238,13 @@ model JobPosting {
   benefits        String?
   status          JobPostingStatus @default(DRAFT)
   hiringManagerId String?
-  hiringManager   User?    @relation("HiringManager", fields: [hiringManagerId], references: [id])
+  hiringManager   User?    @relation("HiringManagerOnPosting", fields: [hiringManagerId], references: [id])
   createdBy       String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   candidates      Candidate[]
+  manager         User?    @relation("ManagedJobPostings", fields: [createdBy], references: [id])
+  interviewers    User[]   @relation("InterviewerOnJobs")
 }
 
 model TeamComment {
@@ -464,6 +485,8 @@ model Candidate {
   jobPosting        JobPosting? @relation(fields: [jobPostingId], references: [id])
   recruiterId       String?
   recruiter         User?    @relation("AssignedToRecruiter", fields: [recruiterId], references: [id])
+  hiringManagerId   String?
+  hiringManager     User?    @relation("HiringManager", fields: [hiringManagerId], references: [id])
   teamComments      TeamComment[]
   scorecards        CandidateScorecard[]
 

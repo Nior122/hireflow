@@ -120,11 +120,11 @@ Return a JSON array sorted by matchScore descending. Return ONLY the JSON array.
     const parsed = JSON.parse(cleaned);
 
     if (Array.isArray(parsed)) {
-      return parsed.map((r: any) => ({
-        title: r.title || "",
-        company: r.company || "",
+      return parsed.map((r: { title?: string; company?: string; matchScore?: number; reason?: string }) => ({
+        title: r.title ?? "",
+        company: r.company ?? "",
         matchScore: r.matchScore ?? 50,
-        reason: r.reason || "",
+        reason: r.reason ?? "",
       }));
     }
   } catch {}

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { createOrGetUser } from "@/lib/clerk";
 
-export async function getTemplates(): Promise<{ success: boolean; data?: any[]; error?: string }> {
+export async function getTemplates(): Promise<{ success: boolean; data?: { id: string; name: string; subject: string; body: string; isDefault: boolean; autoSend: boolean; createdAt: Date }[]; error?: string }> {
   try {
     const user = await createOrGetUser();
     const templates = await prisma.emailTemplate.findMany({ where: { employerId: user.id }, orderBy: { createdAt: "desc" } });

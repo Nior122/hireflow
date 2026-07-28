@@ -249,7 +249,7 @@ export async function updateJobPosting(orgId: string, id: string, data: {
     const perm = await requirePermission(user.id, orgId, "jobs:manage");
     if (!perm.authorized) return { success: false, error: "Not authorized" };
 
-    const job = await prisma.jobPosting.update({ where: { id }, data: data as any });
+    const job = await prisma.jobPosting.update({ where: { id }, data: { title: data.title, department: data.department, status: data.status as "DRAFT" | "PUBLISHED" | "CLOSED" | "ARCHIVED", description: data.description, requirements: data.requirements, benefits: data.benefits, hiringManagerId: data.hiringManagerId } });
     revalidatePath("/dashboard");
     return { success: true, data: job };
   } catch { return { success: false, error: "Failed" }; }

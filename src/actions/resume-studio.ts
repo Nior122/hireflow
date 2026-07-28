@@ -123,7 +123,7 @@ export async function updateSection(id: string, data: { title?: string; content?
     if (!section) return { success: false, error: "Section not found" };
     if (section.resume.userId !== user.id) return { success: false, error: "Not authorized" };
 
-    const updated = await prisma.resumeSection.update({ where: { id }, data: data as any });
+    const updated = await prisma.resumeSection.update({ where: { id }, data: { title: data.title, content: data.content, order: data.order } });
     revalidatePath("/dashboard/resume");
     return { success: true, data: updated };
   } catch { return { success: false, error: "Failed to update section" }; }
@@ -138,7 +138,7 @@ export async function addSection(resumeId: string, type: string, title: string):
 
     const maxOrder = await prisma.resumeSection.aggregate({ where: { resumeId }, _max: { order: true } });
     const section = await prisma.resumeSection.create({
-      data: { resumeId, type: type as any, title, order: (maxOrder._max.order ?? -1) + 1, content: { items: [] } },
+      data: { resumeId, type: type as "EXPERIENCE" | "EDUCATION" | "SKILLS" | "PROJECTS" | "CERTIFICATIONS" | "LANGUAGES" | "AWARDS" | "CUSTOM" | "SUMMARY", title, order: (maxOrder._max.order ?? -1) + 1, content: { items: [] } },
     });
     revalidatePath("/dashboard/resume");
     return { success: true, data: section };
@@ -214,7 +214,7 @@ export async function restoreVersion(versionId: string): Promise<ActionResponse<
     if (!version) return { success: false, error: "Version not found" };
     if (version.resume.userId !== user.id) return { success: false, error: "Not authorized" };
 
-    const snapshot = version.snapshot as any;
+    const snapshot = version.snapshot as { name?: string; title?: string; summary?: string; sections?: Array<{ type: string; title: string; order: number; content: unknown }> };
     await prisma.resume.update({
       where: { id: version.resumeId },
       data: { name: snapshot.name, title: snapshot.title, summary: snapshot.summary },
