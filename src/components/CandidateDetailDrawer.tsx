@@ -66,10 +66,10 @@ export function CandidateDetailDrawer({ candidate, open, onOpenChange }: Props) 
     }
     startTransition(async () => {
       const result = await generateCandidateReply(candidate.id, selectedTemplate, customInstructions || undefined);
-      if (result.success && result.data) {
-        setDraftedReply(result.data.body);
+      if (result.success) {
+        setDraftedReply(result.data?.body ?? "");
         toast.success("Reply drafted");
-      } else {
+      } else if (!result.success) {
         toast.error(result.error ?? "Failed to generate reply");
       }
     });
@@ -149,7 +149,7 @@ export function CandidateDetailDrawer({ candidate, open, onOpenChange }: Props) 
                 <>
                   <div className="space-y-2">
                     <Label className="text-xs">Select Template</Label>
-                    <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+                    <Select value={selectedTemplate} onValueChange={(v: string | null) => { if (v) setSelectedTemplate(v); }}>
                       <SelectTrigger className="h-8"><SelectValue placeholder="Choose a template..." /></SelectTrigger>
                       <SelectContent>
                         {templates.length === 0 ? (

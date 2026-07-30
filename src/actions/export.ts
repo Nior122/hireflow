@@ -10,7 +10,7 @@ export async function exportApplicationsCSV(): Promise<{ success: boolean; data?
     const apps = await prisma.jobApplication.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } });
 
     const headers = ["Company", "Role", "Status", "Source", "Link", "Notes", "Contact Name", "Contact Email", "Created At"];
-    const rows = apps.map(a => [
+    const rows = apps.map((a: { company: string; role: string; status: string; source: string | null; link: string | null; notes: string | null; contactName: string | null; contactEmail: string | null; createdAt: Date }) => [
       a.company, a.role, a.status, a.source ?? "", a.link ?? "", a.notes ?? "",
       a.contactName ?? "", a.contactEmail ?? "", new Date(a.createdAt).toISOString().split("T")[0]
     ].map(escapeCsvCell).join(","));

@@ -90,7 +90,7 @@ export async function duplicateResume(id: string): Promise<ActionResponse<any>> 
         title: original.title,
         summary: original.summary,
         sections: {
-          create: original.sections.map(s => ({ type: s.type, title: s.title, order: s.order, content: s.content })),
+          create: original.sections.map((s: { type: string; title: string; order: number; content: Record<string, unknown> }) => ({ type: s.type, title: s.title, order: s.order, content: s.content })),
         },
       },
       include: { sections: { orderBy: { order: "asc" } }, versions: true },

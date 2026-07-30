@@ -17,7 +17,7 @@ const WEAK_PHRASES = [
   "tasks included", "was able to", "helped to", "tried to",
 ];
 
-export function analyzeAts(resumeText: string, sections: { type: string; content: any }[]): AtsResult {
+export function analyzeAts(resumeText: string, sections: { type: string; content: Record<string, unknown> }[]): AtsResult {
   const text = resumeText.toLowerCase();
   const breakdown: AtsResult["breakdown"] = [];
   const suggestions: AtsResult["suggestions"] = [];
@@ -92,14 +92,14 @@ export function analyzeAts(resumeText: string, sections: { type: string; content
   return { overallScore, breakdown, suggestions: suggestions.slice(0, 8) };
 }
 
-export function resumeToText(resume: { title?: string; summary?: string; sections?: { title: string; content: any }[] }): string {
+export function resumeToText(resume: { title?: string; summary?: string; sections?: { title: string; content: Record<string, unknown> }[] }): string {
   const parts: string[] = [];
   if (resume.title) parts.push(resume.title);
   if (resume.summary) parts.push(resume.summary);
   if (resume.sections) {
     for (const section of resume.sections) {
       parts.push(section.title);
-      const content = section.content as any;
+      const content = section.content as Record<string, unknown>;
       if (content?.items && Array.isArray(content.items)) {
         for (const item of content.items) {
           if (typeof item === "string") parts.push(item);

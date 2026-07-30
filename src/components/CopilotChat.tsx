@@ -74,7 +74,7 @@ export function CopilotChat({ conversationId, onNewMessage }: Props) {
       });
 
       if (!res.ok) {
-        setMessages(prev => [...prev, { role: "assistant", content: "Sorry, I encountered an error. Please try again." }]);
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: "assistant", content: "Sorry, I encountered an error. Please try again." }]);
         setStreaming(false);
         return;
       }
@@ -111,7 +111,7 @@ export function CopilotChat({ conversationId, onNewMessage }: Props) {
                 if (last && last.role === "assistant" && last.toolCalls) {
                   updated[updated.length - 1] = { ...last, content: assistantContent };
                 } else {
-                  updated.push({ role: "assistant", content: assistantContent, toolCalls: toolCalls.length > 0 ? [...toolCalls] : undefined, toolResults: toolResults.length > 0 ? [...toolResults] : undefined });
+                  updated.push({ id: Date.now().toString(), role: "assistant", content: assistantContent, toolCalls: toolCalls.length > 0 ? [...toolCalls] : undefined, toolResults: toolResults.length > 0 ? [...toolResults] : undefined });
                 }
                 return updated;
               });
@@ -123,7 +123,7 @@ export function CopilotChat({ conversationId, onNewMessage }: Props) {
                 if (last && last.role === "assistant") {
                   updated[updated.length - 1] = { ...last, toolCalls: [...toolCalls] };
                 } else {
-                  updated.push({ role: "assistant", content: "", toolCalls: [...toolCalls] });
+                  updated.push({ id: Date.now().toString(), role: "assistant", content: "", toolCalls: [...toolCalls] });
                 }
                 return updated;
               });

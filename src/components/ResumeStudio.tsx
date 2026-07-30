@@ -24,8 +24,8 @@ interface ResumeItem {
   atsScore: number;
   createdAt: string;
   updatedAt: string;
-  sections: any[];
-  versions: any[];
+  sections: { id: string; type: string; title: string; content: Record<string, unknown> }[];
+  versions: { id: string; versionNumber: number; notes?: string }[];
 }
 
 export function ResumeStudio() {

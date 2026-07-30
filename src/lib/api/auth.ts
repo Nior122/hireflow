@@ -48,7 +48,7 @@ export function paginateParams(req: NextRequest) {
   return { page, limit, offset };
 }
 
-export function jsonPaginated(data: any[], total: number, page: number, limit: number) {
+export function jsonPaginated(data: unknown[], total: number, page: number, limit: number) {
   return {
     data,
     pagination: {

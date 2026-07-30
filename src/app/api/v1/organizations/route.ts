@@ -11,5 +11,5 @@ export async function GET(req: NextRequest) {
     include: { organization: true },
   });
 
-  return Response.json({ data: memberships.map(m => ({ ...m.organization, role: m.role })) });
+  return Response.json({ data: memberships.map((m: { organization: Record<string, unknown>; role: string }) => ({ ...m.organization, role: m.role })) });
 }

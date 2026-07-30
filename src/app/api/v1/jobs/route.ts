@@ -7,11 +7,10 @@ export async function GET(req: NextRequest) {
   if (!auth.authenticated) return Response.json({ error: auth.error }, { status: 401 });
 
   const { page, limit, offset } = paginateParams(req);
-  const where: any = {};
 
   const [data, total] = await Promise.all([
-    prisma.savedJob.findMany({ where: { userId: auth.userId }, orderBy: { createdAt: "desc" }, skip: offset, take: limit }),
-    prisma.savedJob.count({ where: { userId: auth.userId } }),
+    prisma.savedJob.findMany({ where: { userId: auth.userId! }, orderBy: { createdAt: "desc" }, skip: offset, take: limit }),
+    prisma.savedJob.count({ where: { userId: auth.userId! } }),
   ]);
 
   return Response.json(jsonPaginated(data, total, page, limit));

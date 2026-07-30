@@ -10,7 +10,7 @@ function subDays(date: Date, days: number): Date {
   return result;
 }
 
-const sampleJobs = [
+const sampleJobs: { company: string; role: string; link: string | null; notes: string; status: string; source: string }[] = [
   { company: "Vercel", role: "Frontend Engineer", link: "https://vercel.com/careers", notes: "Love their developer experience focus.", status: "WISHLIST", source: "LinkedIn" },
   { company: "Linear", role: "Product Designer", link: "https://linear.app/careers", notes: "Amazing design culture.", status: "WISHLIST", source: "Company Site" },
   { company: "Stripe", role: "Full Stack Developer", link: "https://stripe.com/jobs", notes: "Referred by Alex.", status: "WISHLIST", source: "Referral" },

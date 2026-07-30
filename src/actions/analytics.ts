@@ -115,7 +115,7 @@ export async function generateReport(orgId?: string): Promise<ActionResponse<str
           model: "llama-3.1-70b-versatile",
           messages: [
             { role: "system", content: "You are an expert HR analyst. Generate a professional quarterly hiring report in markdown. Include executive summary, key metrics, trends, insights, and recommendations." },
-            { role: "user", content: `Generate a hiring report based on this data:\n\nMetrics: ${JSON.stringify(metrics)}\nFunnel: ${JSON.stringify(funnel)}\nSources: ${JSON.stringify(sources)}\nInsights: ${JSON.stringify(insights.map(i => ({ title: i.title, description: i.description })))}` },
+            { role: "user", content: `Generate a hiring report based on this data:\n\nMetrics: ${JSON.stringify(metrics)}\nFunnel: ${JSON.stringify(funnel)}\nSources: ${JSON.stringify(sources)}\nInsights: ${JSON.stringify(insights.map((i: { title: string; description: string }) => ({ title: i.title, description: i.description })))}` },
           ],
           temperature: 0.4,
           max_tokens: 2000,
@@ -143,13 +143,13 @@ function generateTextReport(metrics: { totalApplications: number; totalHires: nu
 - **Pipeline Velocity**: ${metrics.pipelineVelocity}%
 
 ## Hiring Funnel
-${funnel.map(f => `- **${f.stage}**: ${f.count} candidates (${f.conversion}% conversion)`).join("\n")}
+${funnel.map((f: { stage: string; count: number; conversion: number }) => `- **${f.stage}**: ${f.count} candidates (${f.conversion}% conversion)`).join("\n")}
 
 ## Source Effectiveness
-${sources.map(s => `- **${s.source}**: ${s.applications} applications, ${s.hires} hires (${s.conversion}% conversion)`).join("\n")}
+${sources.map((s: { source: string; applications: number; hires: number; conversion: number }) => `- **${s.source}**: ${s.applications} applications, ${s.hires} hires (${s.conversion}% conversion)`).join("\n")}
 
 ## AI Insights
-${insights.map(i => `### ${i.title}\n${i.description}\n**Confidence**: ${i.confidence}%`).join("\n\n")}
+${insights.map((i: { title: string; description: string; confidence: number }) => `### ${i.title}\n${i.description}\n**Confidence**: ${i.confidence}%`).join("\n\n")}
 
 ## Recommendations
 1. Focus on highest-converting sources

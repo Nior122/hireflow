@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { gatherContext } from "@/lib/copilot/context";
 import { buildSystemPrompt, buildUserMessage } from "@/lib/copilot/prompt";
 import { TOOL_DEFINITIONS, executeTool } from "@/lib/copilot/tools";
-import { GROQ_API_URL, GROQ_GROQ_MODEL } from "@/lib/ai-config";
+import { GROQ_API_URL, GROQ_MODEL } from "@/lib/ai-config";
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();

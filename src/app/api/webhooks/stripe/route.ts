@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
           const statusMap: Record<string, string> = { active: "ACTIVE", past_due: "PAST_DUE", canceled: "CANCELED", trialing: "TRIALING" };
           await prisma.subscription.updateMany({
             where: { stripeSubId: data.id },
-            data: { status: (statusMap[data.status] as any) ?? "ACTIVE" },
+            data: { status: (statusMap[data.status as string] ?? "ACTIVE") as "ACTIVE" | "PAST_DUE" | "CANCELED" | "EXPIRED" | "TRIALING" },
           });
         }
         break;

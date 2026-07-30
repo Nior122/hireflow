@@ -43,7 +43,7 @@ export async function getOrganizations(): Promise<ActionResponse<any[]>> {
       include: { organization: { include: { members: { include: { user: { select: { id: true, email: true, companyName: true } } } } } } },
       orderBy: { joinedAt: "desc" },
     });
-    return { success: true, data: memberships.map(m => ({ ...m.organization, myRole: m.role, memberCount: m.organization.members.length })) };
+    return { success: true, data: memberships.map((m: { organization: Record<string, unknown>; role: string }) => ({ ...m.organization, myRole: m.role, memberCount: (m.organization.members as unknown[])?.length ?? 0 })) };
   } catch { return { success: false, error: "Failed" }; }
 }
 
@@ -325,8 +325,8 @@ export async function submitScorecard(candidateId: string, data: {
 }): Promise<ActionResponse<any>> {
   try {
     const user = await createOrGetUser();
-    const scores = [data.technicalScore, data.communicationScore, data.problemSolvingScore, data.leadershipScore, data.cultureFitScore].filter(Boolean);
-    const overallScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b!, 0) / scores.length) : null;
+    const scoreValues = [data.technicalScore, data.communicationScore, data.problemSolvingScore, data.leadershipScore, data.cultureFitScore].filter((s): s is number => s != null);
+    const overallScore = scoreValues.length > 0 ? Math.round(scoreValues.reduce((a: number, b: number) => a + b, 0) / scoreValues.length) : null;
 
     const card = await prisma.candidateScorecard.create({
       data: { candidateId, userId: user.id, ...data, overallScore },

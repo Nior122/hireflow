@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { getOrganizations, createOrganization, getOrganization, inviteMember, getMembers, getAuditLogs, getJobPostings, createJobPosting } from "@/actions/organizations";
+import type { OrgRole } from "@/lib/org/permissions";
 
 const ROLE_LABELS: Record<string, string> = {
   OWNER: "Owner", ADMIN: "Admin", RECRUITER: "Recruiter",
@@ -72,7 +73,7 @@ export function TeamDashboard() {
 
   async function handleInvite() {
     if (!currentOrg || !inviteEmail.trim()) return;
-    const res = await inviteMember(currentOrg.id, inviteEmail.trim(), inviteRole as any);
+    const res = await inviteMember(currentOrg.id, inviteEmail.trim(), inviteRole as OrgRole);
     if (res.success) { toast.success("Invitation sent!"); setInviteOpen(false); setInviteEmail(""); loadOrgDetail(currentOrg.id); }
     else toast.error(res.error ?? "Failed");
   }

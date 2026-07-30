@@ -121,9 +121,9 @@ export async function getCareerScore(): Promise<ActionResponse<{ score: number; 
     ]);
 
     const total = totalApps.length || 1;
-    const interviews = totalApps.filter(a => ["INTERVIEW", "OFFER"].includes(a.status)).length;
-    const responded = totalApps.filter(a => !["UNAPPLIED", "WISHLIST"].includes(a.status)).length;
-    const completedReminders = reminders.filter(r => r.isCompleted).length;
+    const interviews = totalApps.filter((a: { status: string }) => ["INTERVIEW", "OFFER"].includes(a.status)).length;
+    const responded = totalApps.filter((a: { status: string }) => !["UNAPPLIED", "WISHLIST"].includes(a.status)).length;
+    const completedReminders = reminders.filter((r: { isCompleted: boolean }) => r.isCompleted).length;
     const totalReminders = reminders.length || 1;
 
     const factors = [
@@ -134,7 +134,7 @@ export async function getCareerScore(): Promise<ActionResponse<{ score: number; 
       { label: "Activity Level", value: Math.min(100, recentApps.length * 20 + activities.length * 5), weight: 15 },
     ];
 
-    const score = Math.round(factors.reduce((s, f) => s + (f.value * f.weight / 100), 0));
+    const score = Math.round(factors.reduce((s: number, f: { value: number; weight: number }) => s + (f.value * f.weight / 100), 0));
 
     return { success: true, data: { score, factors } };
   } catch { return { success: false, error: "Failed to compute career score" }; }

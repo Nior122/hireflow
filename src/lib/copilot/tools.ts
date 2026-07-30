@@ -113,7 +113,7 @@ export async function executeTool(userId: string, name: string, args: Record<str
         where: { userId, OR: [{ id: args.companyId }, { company: { contains: args.companyId, mode: "insensitive" } }] },
       });
       if (!app) return `Application not found for "${args.companyId}". Use exact company name.`;
-      await prisma.jobApplication.update({ where: { id: app.id }, data: { status: args.newStatus as any } });
+      await prisma.jobApplication.update({ where: { id: app.id }, data: { status: args.newStatus as "UNAPPLIED" | "WISHLIST" | "APPLIED" | "INTERVIEW" | "OFFER" | "REJECTED" } });
       return `Moved "${app.company}" (${app.role}) to ${args.newStatus}`;
     }
     case "createReminder": {

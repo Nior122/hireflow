@@ -16,7 +16,8 @@ export async function getNextPosition(
   status: string,
   userIdField: string = "userId"
 ): Promise<number> {
-  const lastRecord = await (prisma as any)[tableName].findFirst({
+  const table = prisma[tableName as "jobApplication" | "candidate"];
+  const lastRecord = await table.findFirst({
     where: { [userIdField]: userId, status },
     orderBy: { position: "desc" },
     select: { position: true },
@@ -28,7 +29,7 @@ export async function getNextPosition(
  * Escape a CSV cell value by wrapping in quotes and escaping internal quotes.
  * Handles null/undefined values by returning empty string.
  */
-export function escapeCsvCell(cell: any): string {
+export function escapeCsvCell(cell: unknown): string {
   const value = cell ?? "";
   return `"${String(value).replace(/"/g, '""')}"`;
 }

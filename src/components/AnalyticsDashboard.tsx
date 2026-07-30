@@ -174,7 +174,7 @@ export function AnalyticsDashboard() {
                 <CardHeader><CardTitle className="text-sm">Recruiter Performance</CardTitle></CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {recruiterPerf.slice(0, 5).map((r: any, i: number) => (
+                    {recruiterPerf.slice(0, 5).map((r: { userId: string; email: string; candidatesReviewed: number; hires: number; avgRating: number }, i: number) => (
                       <div key={r.userId} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30">
                         <span className="text-sm font-bold text-muted-foreground w-5">#{i + 1}</span>
                         <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">{r.email[0].toUpperCase()}</div>
@@ -235,8 +235,8 @@ export function AnalyticsDashboard() {
                     <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <Pie data={sourceData} dataKey="applications" nameKey="source" cx="50%" cy="50%" outerRadius={80} label={({ source, percent }) => `${source} ${(percent * 100).toFixed(0)}%`}>
-                            {sourceData.map((_: any, i: number) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                          <Pie data={sourceData} dataKey="applications" nameKey="source" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ""} ${percent != null ? Math.round(percent * 100) + "%" : ""}`}>
+                            {sourceData.map((_: unknown, i: number) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                           </Pie>
                           <Tooltip />
                         </PieChart>
@@ -295,7 +295,7 @@ export function AnalyticsDashboard() {
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={Object.entries(candidateData.statusDist).map(([name, value]) => ({ name, value }))} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                        <Pie data={Object.entries(candidateData.statusDist).map(([n, v]) => ({ name: n, value: v }))} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ""} ${percent != null ? Math.round(percent * 100) + "%" : ""}`}>
                           {Object.keys(candidateData.statusDist).map((_: string, i: number) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                         </Pie>
                         <Tooltip />

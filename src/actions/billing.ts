@@ -141,7 +141,7 @@ export async function listApiKeys(): Promise<ActionResponse<any[]>> {
       where: { userId: user.id, revokedAt: null },
       orderBy: { createdAt: "desc" },
     });
-    return { success: true, data: keys.map(k => ({ ...k, key: k.key.slice(0, 8) + "..." })) };
+    return { success: true, data: keys.map((k: { id: string; name: string; key: string; scopes: string; createdAt: Date }) => ({ ...k, key: k.key.slice(0, 8) + "..." })) };
   } catch { return { success: false, error: "Failed" }; }
 }
 
@@ -177,7 +177,7 @@ export async function listWebhooks(): Promise<ActionResponse<any[]>> {
       where: { userId: user.id, status: "ACTIVE" },
       select: { organizationId: true },
     });
-    const orgIds = memberships.map(m => m.organizationId);
+    const orgIds = memberships.map((m: { organizationId: string }) => m.organizationId);
     const hooks = await prisma.webhook.findMany({
       where: {
         OR: [
@@ -251,7 +251,7 @@ export async function getAdminStats(): Promise<ActionResponse<any>> {
         totalUsers: users,
         subscriptionsByPlan: planCounts,
         activeApiKeys: apiKeys,
-        totalRevenue: subscriptions.reduce((s, sub) => {
+        totalRevenue: subscriptions.reduce((s: number, sub: { plan: string; _count: { plan: number } }) => {
           const plan = getPlan(sub.plan);
           return s + (plan.priceMonthly * sub._count.plan);
         }, 0),

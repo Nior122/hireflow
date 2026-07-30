@@ -12,7 +12,7 @@ export async function getCandidates(): Promise<ActionResponse<CandidateCard[]>> 
       where: { employerId: user.id },
       orderBy: [{ status: "asc" }, { position: "asc" }],
     });
-    return { success: true, data: candidates.map(c => ({
+    return { success: true, data: candidates.map((c: { id: string; name: string; email: string; phone: string | null; positionApplied: string; status: string; rating: number | null; tags: string[]; sourceEmailId: string | null; position: number; appliedAt: Date; updatedAt: Date }) => ({
       id: c.id, name: c.name, email: c.email, phone: c.phone,
       positionApplied: c.positionApplied, status: c.status as CandidateStatus,
       rating: c.rating, tags: c.tags, sourceEmailId: c.sourceEmailId,
@@ -62,10 +62,10 @@ export async function moveCandidate(id: string, newStatus: CandidateStatus, newP
 
     if (cand.status === newStatus) {
       const columnCands = await prisma.candidate.findMany({ where: { employerId: user.id, status: newStatus }, orderBy: { position: "asc" } });
-      const reordered = columnCands.filter(c => c.id !== id);
+      const reordered = columnCands.filter((c: { id: string }) => c.id !== id);
       const clampedPosition = Math.min(newPosition, reordered.length);
       reordered.splice(clampedPosition, 0, cand);
-      await prisma.$transaction(reordered.map((c, index) => prisma.candidate.update({ where: { id: c.id }, data: { position: index } })));
+      await prisma.$transaction(reordered.map((c: { id: string }, index: number) => prisma.candidate.update({ where: { id: c.id }, data: { position: index } })));
     } else {
       // Wrap cross-column move in a transaction to ensure atomicity
       await prisma.$transaction([

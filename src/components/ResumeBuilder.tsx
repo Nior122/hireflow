@@ -16,7 +16,7 @@ import { AiAssistantPanel } from "./AiAssistantPanel";
 import { AtsPanel } from "./AtsPanel";
 
 interface Props {
-  resume: any;
+  resume: { id: string; name: string; title: string; summary: string; sections: { id: string; type: string; title: string; content: Record<string, unknown> }[]; versions: { id: string; versionNumber: number; notes?: string }[] };
   onBack: () => void;
 }
 
@@ -180,9 +180,9 @@ export function ResumeBuilder({ resume: initial, onBack }: Props) {
   );
 }
 
-function SectionEditor({ section, onChange }: { section: any; onChange: (data: any) => void }) {
+function SectionEditor({ section, onChange }: { section: { id: string; type: string; title: string; content: Record<string, unknown> }; onChange: (data: { title?: string; content?: Record<string, unknown> }) => void }) {
   const [expanded, setExpanded] = useState(false);
-  const content = (section.content as any) ?? {};
+  const content = section.content as Record<string, unknown> ?? {};
   const items = Array.isArray(content.items) ? content.items : [];
 
   function addItem() {
@@ -201,7 +201,7 @@ function SectionEditor({ section, onChange }: { section: any; onChange: (data: a
   }
 
   function removeItem(idx: number) {
-    onChange({ content: { items: items.filter((_: any, i: number) => i !== idx) } });
+    onChange({ content: { items: items.filter((_: unknown, i: number) => i !== idx) } });
   }
 
   return (
@@ -212,7 +212,7 @@ function SectionEditor({ section, onChange }: { section: any; onChange: (data: a
         <div className="mt-2 space-y-2" onClick={e => e.stopPropagation()}>
           <Input value={section.title} onChange={e => onChange({ title: e.target.value })} className="h-6 text-[10px]" />
           <div className="space-y-2 mt-2 max-h-60 overflow-y-auto">
-            {items.map((item: any, idx: number) => (
+            {items.map((item: Record<string, unknown>, idx: number) => (
               <div key={idx} className="p-2 rounded bg-background border space-y-1">
                 <div className="flex justify-between items-center">
                   <p className="text-[9px] text-muted-foreground font-medium">Item {idx + 1}</p>

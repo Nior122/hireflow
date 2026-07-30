@@ -60,11 +60,7 @@ export function AddCandidateDialog({ onCandidateCreated }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" className="gap-2">
-          <Plus className="h-4 w-4" /> Add Candidate
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger render={<Button size="sm" className="gap-2"><Plus className="h-4 w-4" /> Add Candidate</Button>} />
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Candidate</DialogTitle>

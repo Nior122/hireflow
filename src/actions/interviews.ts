@@ -162,10 +162,10 @@ export async function getInterviewAnalytics(): Promise<ActionResponse<{
     const byCategory: Record<string, number> = {};
     practices.forEach((p: { category: string }) => { byCategory[p.category] = (byCategory[p.category] ?? 0) + 1; });
 
-    const scores = practices.filter(p => p.score != null).map(p => p.score!);
-    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+    const scores = practices.filter((p: { score: number | null }) => p.score != null).map((p: { score: number | null }) => p.score!);
+    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length) : 0;
 
-    const recentScores = practices.filter(p => p.score != null).slice(0, 20).reverse().map(p => ({
+    const recentScores = practices.filter((p: { score: number | null }) => p.score != null).slice(0, 20).reverse().map((p: { score: number | null; createdAt: Date }) => ({
       date: p.createdAt.toISOString().split("T")[0],
       score: p.score!,
     }));
@@ -174,10 +174,10 @@ export async function getInterviewAnalytics(): Promise<ActionResponse<{
       success: true,
       data: {
         total: interviews.length,
-        completed: interviews.filter(i => i.status === "COMPLETED").length,
-        scheduled: interviews.filter(i => i.status === "SCHEDULED").length,
-        missed: interviews.filter(i => i.status === "MISSED").length,
-        cancelled: interviews.filter(i => i.status === "CANCELLED").length,
+        completed: interviews.filter((i: { status: string }) => i.status === "COMPLETED").length,
+        scheduled: interviews.filter((i: { status: string }) => i.status === "SCHEDULED").length,
+        missed: interviews.filter((i: { status: string }) => i.status === "MISSED").length,
+        cancelled: interviews.filter((i: { status: string }) => i.status === "CANCELLED").length,
         avgScore,
         totalPractices: practices.length,
         byType,
