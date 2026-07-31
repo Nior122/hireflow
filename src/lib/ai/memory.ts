@@ -31,7 +31,7 @@ export interface CareerContext {
 export async function getUserCareerContext(userId: string): Promise<CareerContext> {
   const applications = await prisma.jobApplication.findMany({
     where: { userId },
-    select: { status: true, company: true, createdAt: true, updatedAt: true },
+    select: { status: true, company: true, role: true, createdAt: true, updatedAt: true },
   });
 
   const totalApplications = applications.length;
