@@ -31,7 +31,7 @@ export function JobDetailDrawer({ job, isOpen, onClose, isSaved, onJobSaved, onJ
     if (isSaved) return;
     startSave(async () => {
       const result = await saveJob(job!);
-      if (result.success) { toast.success("Job saved!"); onSaved(job!); }
+      if (result.success) { toast.success("Job saved!"); onJobSaved(job!); }
       else toast.error(result.error ?? "Failed to save");
     });
   }
@@ -43,7 +43,7 @@ export function JobDetailDrawer({ job, isOpen, onClose, isSaved, onJobSaved, onJ
       if (result.success) {
         toast.success("Job added to your Kanban board!");
         setImported(true);
-        onImported(job!);
+        onJobImported(job!);
       } else toast.error(result.error ?? "Failed to import");
     });
   }
