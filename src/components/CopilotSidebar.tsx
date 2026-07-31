@@ -114,10 +114,13 @@ export function CopilotSidebar({ activeId, onSelect, onNew, roleContext }: Props
               )}
             </div>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                <Button variant="ghost" size="icon-xs" className="h-5 w-5 opacity-0 group-hover:opacity-100">
-                  <MoreHorizontal className="h-3 w-3" />
-                </Button>
+              <DropdownMenuTrigger
+                onClick={e => e.stopPropagation()}
+                render={
+                  <Button variant="ghost" size="icon-xs" className="h-5 w-5 opacity-0 group-hover:opacity-100" />
+                }
+              >
+                <MoreHorizontal className="h-3 w-3" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => { setEditingId(conv.id); setEditTitle(conv.title); }}>

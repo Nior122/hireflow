@@ -70,13 +70,15 @@ export function Header() {
         </div>
         <div className="flex items-center gap-2">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-                {hasNotifications && (
-                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
-                )}
-              </Button>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="ghost" size="icon" className="relative" />
+              }
+            >
+              <Bell className="h-5 w-5" />
+              {hasNotifications && (
+                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
+              )}
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-72 p-0" align="end">
               <div className="p-3 border-b">
