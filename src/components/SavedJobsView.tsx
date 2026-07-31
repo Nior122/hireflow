@@ -100,7 +100,7 @@ export function SavedJobsView({ jobs, loading, onLoadSaved, onRemoveJob, onJobCl
                 )}
                 <div className="flex-1" />
                 {job.applicationUrl && (
-                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); window.open(job.applicationUrl!, "_blank"); }}><ExternalLink className="h-3 w-3" /></Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); if (!job.applicationUrl) return; window.open(job.applicationUrl, "_blank", "noopener,noreferrer"); }}><ExternalLink className="h-3 w-3" /></Button>
                 )}
                 <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={(e) => { e.stopPropagation(); handleDelete(job.id); }} disabled={deleting}><Trash2 className="h-3 w-3" /></Button>
               </div>

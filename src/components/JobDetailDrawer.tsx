@@ -157,7 +157,7 @@ export function JobDetailDrawer({ job, isOpen, onClose, isSaved, onJobSaved, onJ
               <Sparkles className="h-4 w-4 text-amber-500" /> Analyze Match
             </Button>
             {job.applicationUrl && (
-              <Button variant="outline" className="w-full gap-2" onClick={() => window.open(job.applicationUrl, "_blank")}>
+              <Button variant="outline" className="w-full gap-2" onClick={() => { if (!job.applicationUrl) return; window.open(job.applicationUrl, "_blank", "noopener,noreferrer"); }}>
                 <ExternalLink className="h-4 w-4" /> Open Original Posting
               </Button>
             )}
