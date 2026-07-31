@@ -86,7 +86,7 @@ function ResumeSectionPreview({ section, template }: { section: { type: string; 
                 <p className="text-xs text-gray-500 dark:text-gray-500">{(item.period as string) ?? ""}</p>
               </div>
               {typeof item.description === "string" && item.description && <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{item.description}</p>}
-              {item.bullets && Array.isArray(item.bullets) && item.bullets.length > 0 && (
+              {Array.isArray(item.bullets) && item.bullets.length > 0 && (
                 <ul className="mt-1 space-y-0.5">
                   {item.bullets.filter((b: string) => b.trim()).map((b: string, j: number) => (
                     <li key={j} className="text-xs text-gray-600 dark:text-gray-400 pl-3 relative before:content-['•'] before:absolute before:left-0">{b}</li>
