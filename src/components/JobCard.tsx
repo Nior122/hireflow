@@ -52,7 +52,7 @@ export function JobCard({ job, isSaved, onClick, onSaved, onImported }: Props) {
     });
   }
 
-  function formatSalary(min: number | null, max: number | null, currency?: string | null) {
+  function formatSalary(min: number | null | undefined, max: number | null | undefined, currency?: string | null) {
     if (!min && !max) return null;
     const fmt = (n: number) => n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${n}`;
     if (min && max) return `${fmt(min)} - ${fmt(max)}`;
