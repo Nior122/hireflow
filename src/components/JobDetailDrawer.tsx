@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
-import { X, Bookmark, BookmarkCheck, Plus, ExternalLink, MapPin, DollarSign, Building2, Globe, Sparkles, Loader2 } from "lucide-react";
+import { X, Bookmark, BookmarkCheck, Plus, ExternalLink, MapPin, DollarSign, Building2, Globe, Sparkles, Loader2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { saveJob, importJobDirectlyToKanban } from "@/actions/discover";

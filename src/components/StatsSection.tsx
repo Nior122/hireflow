@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { TrendingUp, Clock, Building2, BarChart3 } from "lucide-react";
 import { STATUS_LABELS, STATUS_ORDER, type ApplicationCard, type ApplicationStatus } from "@/lib/types";
 import { differenceInDays } from "date-fns";
