@@ -36,8 +36,8 @@ export function ResumeMatcher({ company, role, jobDescription, open, onOpenChang
     }
     startTransition(async () => {
       const response = await analyzeMatch(resumeText, jobDescription || `Role: ${role} at ${company}`);
-      if (response.success && response.data) {
-        setResult(response.data);
+      if (response.success) {
+        if (response.data) setResult(response.data);
         toast.success("Analysis complete!");
       } else {
         toast.error(response.error ?? "Failed to analyze");

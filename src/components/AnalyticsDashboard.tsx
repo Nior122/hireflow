@@ -68,7 +68,7 @@ export function AnalyticsDashboard() {
   async function handleExport(format: "csv" | "json") {
     const res = await exportAnalytics(format);
     if (res.success) {
-      const blob = new Blob([res.data!], { type: format === "csv" ? "text/csv" : "application/json" });
+      const blob = new Blob([res.data], { type: format === "csv" ? "text/csv" : "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

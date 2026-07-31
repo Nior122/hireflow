@@ -26,8 +26,8 @@ export function JobMatchAnalysis({ job, open, onOpenChange }: Props) {
         job.title,
         job.company
       );
-      if (res.success && res.data) {
-        setResult(res.data);
+      if (res.success) {
+        if (res.data) setResult(res.data);
         toast.success("Analysis complete!");
       } else {
         toast.error(res.error ?? "Failed to analyze");
