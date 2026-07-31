@@ -137,10 +137,10 @@ export function CopilotChat({ conversationId, onNewMessage }: Props) {
       }
 
       if (!assistantContent && toolCalls.length === 0) {
-        setMessages(prev => [...prev, { role: "assistant", content: "I received an empty response. Please try again." }]);
+        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "assistant", content: "I received an empty response. Please try again." }]);
       }
     } catch {
-      setMessages(prev => [...prev, { role: "assistant", content: "Connection error. Please check your network and try again." }]);
+      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "assistant", content: "Connection error. Please check your network and try again." }]);
     }
     setStreaming(false);
   }, [streaming, messages, conversationId, onNewMessage]);
