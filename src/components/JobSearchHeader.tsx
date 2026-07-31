@@ -118,7 +118,7 @@ export function JobSearchHeader({ onSearch, loading }: Props) {
           </div>
           <div className="space-y-1">
             <Label className="text-[10px] text-muted-foreground">Job Type</Label>
-            <Select value={jobType} onValueChange={setJobType}>
+            <Select value={jobType} onValueChange={v => setJobType(v ?? "")}>
               <SelectTrigger className="h-9 w-[130px]"><SelectValue placeholder="Any" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="full_time">Full-time</SelectItem>

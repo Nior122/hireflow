@@ -268,7 +268,7 @@ export function TeamDashboard() {
           <div className="space-y-4">
             <div className="space-y-1"><Label className="text-xs">Email Address</Label><Input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="colleague@company.com" /></div>
             <div className="space-y-1"><Label className="text-xs">Role</Label>
-              <Select value={inviteRole} onValueChange={setInviteRole}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+              <Select value={inviteRole} onValueChange={v => setInviteRole(v ?? "")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
                 {["ADMIN", "RECRUITER", "HIRING_MANAGER", "INTERVIEWER", "VIEWER"].map(r => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}
               </SelectContent></Select>
             </div>

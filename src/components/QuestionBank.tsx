@@ -54,7 +54,7 @@ export function QuestionBank() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <Input value={company} onChange={e => setCompany(e.target.value)} placeholder="Company (optional)" className="h-9" />
           <Input value={role} onChange={e => setRole(e.target.value)} placeholder="Role" className="h-9" />
-          <Select value={type} onValueChange={setType}>
+          <Select value={type} onValueChange={v => setType(v ?? "")}>
             <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
               {["Technical", "Behavioral", "System Design", "Coding", "Culture Fit", "Leadership", "Frontend", "Backend", "DevOps", "Data Structures"].map(t => (
@@ -62,7 +62,7 @@ export function QuestionBank() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={difficulty} onValueChange={setDifficulty}>
+          <Select value={difficulty} onValueChange={v => setDifficulty(v ?? "")}>
             <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
             <SelectContent>{["Easy", "Medium", "Hard"].map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
           </Select>

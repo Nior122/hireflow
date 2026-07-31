@@ -243,7 +243,7 @@ function CreateInterviewForm({ onSubmit }: { onSubmit: (data: any) => void }) {
       </div>
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-1"><Label className="text-xs">Type</Label>
-          <Select value={type} onValueChange={setType}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+          <Select value={type} onValueChange={v => setType(v ?? "")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
             {INTERVIEW_TYPES.map(t => <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>)}
           </SelectContent></Select>
         </div>

@@ -133,12 +133,12 @@ export function MockInterview() {
         <p className="text-sm text-muted-foreground">Practice with an AI interviewer. Get real-time feedback on your answers.</p>
         <div className="grid grid-cols-2 gap-3 text-left">
           <div className="space-y-1"><label className="text-xs font-medium">Interview Type</label>
-            <Select value={type} onValueChange={setType}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+            <Select value={type} onValueChange={v => setType(v ?? "")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
               {["Technical", "Behavioral", "System Design", "HR", "Phone Screen"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             </SelectContent></Select>
           </div>
           <div className="space-y-1"><label className="text-xs font-medium">Difficulty</label>
-            <Select value={difficulty} onValueChange={setDifficulty}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+            <Select value={difficulty} onValueChange={v => setDifficulty(v ?? "")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
               {["Easy", "Medium", "Hard"].map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
             </SelectContent></Select>
           </div>
