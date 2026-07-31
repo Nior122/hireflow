@@ -7,14 +7,14 @@ import { cn } from "@/lib/utils";
 interface Props {
   title: string;
   summary: string;
-  sections: { id: string; type: string; title: string; content: Record<string, unknown> }[];
+  sections: { id: string; type: string; title: string; order?: number; content: Record<string, unknown> }[];
   template: string;
 }
 
 export function ResumePreview({ title, summary, sections, template }: Props) {
   const tpl = useMemo(() => getTemplate(template), [template]);
 
-  const sortedSections = useMemo(() => [...sections].sort((a, b) => a.order - b.order), [sections]);
+  const sortedSections = useMemo(() => [...sections].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)), [sections]);
 
   return (
     <div className="max-w-2xl mx-auto bg-white dark:bg-zinc-950 shadow-xl rounded-xl overflow-hidden">
@@ -85,7 +85,7 @@ function ResumeSectionPreview({ section, template }: { section: { type: string; 
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-500">{(item.period as string) ?? ""}</p>
               </div>
-              {item.description && <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{item.description}</p>}
+              {typeof item.description === "string" && item.description && <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{item.description}</p>}
               {item.bullets && Array.isArray(item.bullets) && item.bullets.length > 0 && (
                 <ul className="mt-1 space-y-0.5">
                   {item.bullets.filter((b: string) => b.trim()).map((b: string, j: number) => (

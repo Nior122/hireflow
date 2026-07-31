@@ -184,6 +184,7 @@ function SectionEditor({ section, onChange }: { section: { id: string; type: str
   const [expanded, setExpanded] = useState(false);
   const content = section.content as Record<string, unknown> ?? {};
   const items = Array.isArray(content.items) ? content.items : [];
+  const textOf = (v: unknown) => (typeof v === "string" ? v : "");
 
   function addItem() {
     const newItem = section.type === "SKILLS"
@@ -219,22 +220,22 @@ function SectionEditor({ section, onChange }: { section: { id: string; type: str
                   <button onClick={() => removeItem(idx)} className="text-[9px] text-destructive">Remove</button>
                 </div>
                 {section.type === "SKILLS" ? (
-                  <Input value={(item.skills ?? []).join(", ")} onChange={e => updateItem(idx, { skills: e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean) })} placeholder="Skills (comma-separated)" className="h-6 text-[10px]" />
+                  <Input value={Array.isArray(item.skills) ? item.skills.join(", ") : ""} onChange={e => updateItem(idx, { skills: e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean) })} placeholder="Skills (comma-separated)" className="h-6 text-[10px]" />
                 ) : section.type === "EDUCATION" ? (
                   <div className="space-y-1">
-                    <Input value={item.school ?? ""} onChange={e => updateItem(idx, { school: e.target.value })} placeholder="School" className="h-6 text-[10px]" />
-                    <Input value={item.degree ?? ""} onChange={e => updateItem(idx, { degree: e.target.value })} placeholder="Degree" className="h-6 text-[10px]" />
-                    <Input value={item.year ?? ""} onChange={e => updateItem(idx, { year: e.target.value })} placeholder="Year" className="h-6 text-[10px]" />
+                    <Input value={textOf(item.school)} onChange={e => updateItem(idx, { school: e.target.value })} placeholder="School" className="h-6 text-[10px]" />
+                    <Input value={textOf(item.degree)} onChange={e => updateItem(idx, { degree: e.target.value })} placeholder="Degree" className="h-6 text-[10px]" />
+                    <Input value={textOf(item.year)} onChange={e => updateItem(idx, { year: e.target.value })} placeholder="Year" className="h-6 text-[10px]" />
                   </div>
                 ) : (
                   <div className="space-y-1">
                     <div className="grid grid-cols-2 gap-1">
-                      <Input value={item.company ?? ""} onChange={e => updateItem(idx, { company: e.target.value })} placeholder="Company" className="h-6 text-[10px]" />
-                      <Input value={item.role ?? ""} onChange={e => updateItem(idx, { role: e.target.value })} placeholder="Role" className="h-6 text-[10px]" />
+                      <Input value={textOf(item.company)} onChange={e => updateItem(idx, { company: e.target.value })} placeholder="Company" className="h-6 text-[10px]" />
+                      <Input value={textOf(item.role)} onChange={e => updateItem(idx, { role: e.target.value })} placeholder="Role" className="h-6 text-[10px]" />
                     </div>
-                    <Input value={item.period ?? ""} onChange={e => updateItem(idx, { period: e.target.value })} placeholder="2020 - Present" className="h-6 text-[10px]" />
+                    <Input value={textOf(item.period)} onChange={e => updateItem(idx, { period: e.target.value })} placeholder="2020 - Present" className="h-6 text-[10px]" />
                     <Textarea
-                      value={(item.bullets ?? []).join("\n")}
+                      value={Array.isArray(item.bullets) ? item.bullets.join("\n") : ""}
                       onChange={e => updateItem(idx, { bullets: e.target.value.split("\n").filter((b: string) => b.trim()) })}
                       placeholder="Achievement bullets (one per line)"
                       rows={2}
