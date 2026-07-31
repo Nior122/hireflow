@@ -8,7 +8,7 @@ import { getReminders } from "@/actions/reminders";
 import { getSavedJobs } from "@/actions/discover";
 import { getCareerScore } from "@/actions/copilot";
 import { Badge } from "@/components/ui/badge";
-import type { ApplicationCard } from "@/lib/types";
+import type { ApplicationCard, ActionResponse, SavedJobData } from "@/lib/types";
 
 interface Props {
   role: string;
@@ -26,7 +26,7 @@ export function CopilotContextPanel({ role }: Props) {
       const [appsRes, remindersRes, savedRes] = await Promise.all([
         getApplications(),
         getReminders(),
-        role !== "EMPLOYER" ? getSavedJobs() : Promise.resolve({ success: false }),
+        role !== "EMPLOYER" ? getSavedJobs() : Promise.resolve<ActionResponse<SavedJobData[]>>({ success: false, error: "Unavailable" }),
       ]);
       if (appsRes.success) setApps(appsRes.data ?? []);
       if (remindersRes.success) setReminders(remindersRes.data ?? []);
