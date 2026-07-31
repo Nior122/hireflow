@@ -69,11 +69,9 @@ export interface AiInsight {
 export async function getExecutiveMetrics(orgId?: string): Promise<ExecutiveMetrics> {
   const where = orgId ? { organizationId: orgId } : {};
 
-  const [candidates, interviews, jobPostings] = await Promise.all([
-    prisma.candidate.findMany({ where: orgId ? { employer: { orgMemberships: { some: { organizationId: orgId } } } } : {}, select: { status: true, appliedAt: true, rating: true } }),
-    prisma.interview.findMany({ where: orgId ? { user: { orgMemberships: { some: { organizationId: orgId } } } } : {}, select: { status: true, createdAt: true } }),
-    prisma.jobPosting.findMany({ where: orgId ? { organizationId: orgId } : {}, select: { status: true } }),
-  ]);
+  const candidates: Array<{ status: string; appliedAt: Date; rating: number | null }> = await prisma.candidate.findMany({ where: orgId ? { employer: { orgMemberships: { some: { organizationId: orgId } } } } : {}, select: { status: true, appliedAt: true, rating: true } });
+  const interviews: Array<{ status: string; createdAt: Date }> = await prisma.interview.findMany({ where: orgId ? { user: { orgMemberships: { some: { organizationId: orgId } } } } : {}, select: { status: true, createdAt: true } });
+  const jobPostings: Array<{ status: string }> = await prisma.jobPosting.findMany({ where: orgId ? { organizationId: orgId } : {}, select: { status: true } });
 
   const totalCandidates = candidates.length;
   const byStatus = (s: string) => candidates.filter(c => c.status === s).length;
@@ -126,7 +124,7 @@ export async function getExecutiveMetrics(orgId?: string): Promise<ExecutiveMetr
 // ─── Hiring Funnel ─────────────────────────────────────────────
 
 export async function getHiringFunnel(orgId?: string): Promise<HiringFunnel[]> {
-  const candidates = await prisma.candidate.findMany({
+  const candidates: Array<{ status: string; appliedAt: Date; updatedAt: Date }> = await prisma.candidate.findMany({
     where: orgId ? { employer: { orgMemberships: { some: { organizationId: orgId } } } } : {},
     select: { status: true, appliedAt: true, updatedAt: true },
   });
@@ -147,7 +145,7 @@ export async function getHiringFunnel(orgId?: string): Promise<HiringFunnel[]> {
 // ─── Source Analytics ──────────────────────────────────────────
 
 export async function getSourceAnalytics(orgId?: string): Promise<SourceAnalytics[]> {
-  const candidates = await prisma.candidate.findMany({
+  const candidates: Array<{ status: string; sourceEmailId: string | null }> = await prisma.candidate.findMany({
     where: orgId ? { employer: { orgMemberships: { some: { organizationId: orgId } } } } : {},
     select: { status: true, sourceEmailId: true },
   });
@@ -176,7 +174,7 @@ export async function getSourceAnalytics(orgId?: string): Promise<SourceAnalytic
 // ─── Recruiter Performance ────────────────────────────────────
 
 export async function getRecruiterPerformance(orgId?: string): Promise<RecruiterPerf[]> {
-  const members = await prisma.organizationMember.findMany({
+  const members: Array<{ user: { id: string; email: string | null } }> = await prisma.organizationMember.findMany({
     where: orgId ? { organizationId: orgId, role: { in: ["OWNER", "ADMIN", "RECRUITER"] } } : {},
     include: {
       user: { select: { id: true, email: true } },
@@ -186,7 +184,7 @@ export async function getRecruiterPerformance(orgId?: string): Promise<Recruiter
   const results: RecruiterPerf[] = [];
 
   for (const member of members) {
-    const candidates = await prisma.candidate.findMany({
+    const candidates: Array<{ status: string; rating: number | null }> = await prisma.candidate.findMany({
       where: { recruiterId: member.user.id },
       select: { status: true, rating: true },
     });
@@ -289,7 +287,7 @@ export async function generateAiInsights(orgId?: string): Promise<AiInsight[]> {
 // ─── Candidate Score ──────────────────────────────────────────
 
 export async function getCandidateScores(orgId?: string) {
-  const candidates = await prisma.candidate.findMany({
+  const candidates: Array<{ id: string; name: string; status: string; rating: number | null; keySkills: string[]; experienceSummary: string | null; appliedAt: Date }> = await prisma.candidate.findMany({
     where: orgId ? { employer: { orgMemberships: { some: { organizationId: orgId } } } } : {},
     select: { id: true, name: true, status: true, rating: true, keySkills: true, experienceSummary: true, appliedAt: true },
   });

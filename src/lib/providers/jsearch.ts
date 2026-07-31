@@ -64,7 +64,7 @@ export class JSearchProvider implements JobProvider {
     const parsed = JSearchResponseSchema.safeParse(raw);
     if (!parsed.success) return [];
 
-    return parsed.data.slice(0, 20).map(job => this.normalize(job));
+    return parsed.data.data.slice(0, 20).map(job => this.normalize(job));
   }
 
   private normalize(job: z.infer<typeof JSearchResponseSchema.shape.data.element>): JobResult {
