@@ -77,18 +77,18 @@ export async function executeTool(userId: string, name: string, args: Record<str
       return JSON.stringify(apps);
     }
     case "getSavedJobs": {
-      const jobs = await prisma.savedJob.findMany({ where: { userId }, orderBy: { createdAt: "desc" } });
+      const jobs: Array<{ title: string; company: string; source: string; importedToKanban: boolean }> = await prisma.savedJob.findMany({ where: { userId }, orderBy: { createdAt: "desc" } });
       return JSON.stringify(jobs.map(j => ({ title: j.title, company: j.company, source: j.source, imported: j.importedToKanban })));
     }
     case "getReminders": {
-      const reminders = await prisma.reminder.findMany({
+      const reminders: Array<{ id: string; title: string; dueDate: Date }> = await prisma.reminder.findMany({
         where: { userId, isCompleted: false },
         orderBy: { dueDate: "asc" },
       });
       return JSON.stringify(reminders.map(r => ({ id: r.id, title: r.title, dueDate: r.dueDate })));
     }
     case "getActivity": {
-      const logs = await prisma.activityLog.findMany({
+      const logs: Array<{ action: string; detail: string | null; createdAt: Date }> = await prisma.activityLog.findMany({
         where: { userId },
         orderBy: { createdAt: "desc" },
         take: 20,
@@ -97,7 +97,7 @@ export async function executeTool(userId: string, name: string, args: Record<str
     }
     case "getCandidates": {
       if (role !== "EMPLOYER") return "Access denied";
-      const cands = await prisma.candidate.findMany({
+      const cands: Array<{ id: string; name: string; email: string; status: string; rating: number | null; positionApplied: string }> = await prisma.candidate.findMany({
         where: { employerId: userId },
         orderBy: { updatedAt: "desc" },
       });
@@ -105,7 +105,7 @@ export async function executeTool(userId: string, name: string, args: Record<str
     }
     case "getTemplates": {
       if (role !== "EMPLOYER") return "Access denied";
-      const templates = await prisma.emailTemplate.findMany({ where: { employerId: userId } });
+      const templates: Array<{ id: string; name: string; subject: string; isDefault: boolean }> = await prisma.emailTemplate.findMany({ where: { employerId: userId } });
       return JSON.stringify(templates.map(t => ({ id: t.id, name: t.name, subject: t.subject, isDefault: t.isDefault })));
     }
     case "moveApplication": {

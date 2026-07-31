@@ -26,7 +26,13 @@ export async function gatherContext(userId: string, role: string): Promise<Copil
 }
 
 async function gatherJobSeekerContext(userId: string) {
-  const [applications, savedJobs, reminders, activities, recentApps] = await Promise.all([
+  const [applications, savedJobs, reminders, activities, recentApps]: [
+    Array<{ id: string; company: string; role: string; status: string; source: string | null; notes: string | null; contactName: string | null; contactEmail: string | null; link: string | null; createdAt: Date; updatedAt: Date; }>,
+    unknown[],
+    unknown[],
+    unknown[],
+    Array<{ company: string; role: string; updatedAt: Date; }>
+  ] = await Promise.all([
     prisma.jobApplication.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
@@ -91,7 +97,11 @@ async function gatherJobSeekerContext(userId: string) {
 }
 
 async function gatherEmployerContext(userId: string) {
-  const [candidates, templates, activities] = await Promise.all([
+  const [candidates, templates, activities]: [
+    Array<{ id: string; name: string; email: string; positionApplied: string; status: string; rating: number | null; tags: string[]; notes: string | null; appliedAt: Date; updatedAt: Date; }>,
+    unknown[],
+    unknown[]
+  ] = await Promise.all([
     prisma.candidate.findMany({
       where: { employerId: userId },
       orderBy: { updatedAt: "desc" },
