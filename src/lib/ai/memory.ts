@@ -29,13 +29,7 @@ export interface CareerContext {
  * Get user's career context from their data.
  */
 export async function getUserCareerContext(userId: string): Promise<CareerContext> {
-  const applications: Array<{
-    status: string;
-    company: string;
-    role: string;
-    createdAt: Date;
-    updatedAt: Date;
-  }> = await prisma.jobApplication.findMany({
+  const applications = await prisma.jobApplication.findMany({
     where: { userId },
     select: { status: true, company: true, role: true, createdAt: true, updatedAt: true },
   });

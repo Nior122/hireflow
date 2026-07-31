@@ -1,7 +1,8 @@
 'use server';
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { prisma, Prisma } from "@/lib/prisma";
+import type { InterviewStatus } from "@prisma/client";
 import { createOrGetUser } from "@/lib/clerk";
 import type { ActionResponse } from "@/lib/types";
 
@@ -56,8 +57,8 @@ export async function updateInterview(id: string, data: {
     const user = await createOrGetUser();
     const existing = await prisma.interview.findFirst({ where: { id, userId: user.id } });
     if (!existing) return { success: false, error: "Interview not found" };
-    const update: { status?: string; notes?: string; scheduledAt?: Date; location?: string; meetingLink?: string; interviewerName?: string } = {};
-    if (data.status) update.status = data.status;
+    const update: Prisma.InterviewUpdateInput = {};
+    if (data.status) update.status = data.status as InterviewStatus;
     if (data.notes) update.notes = data.notes;
     if (data.scheduledAt) update.scheduledAt = new Date(data.scheduledAt);
     if (data.location !== undefined) update.location = data.location;
@@ -96,7 +97,7 @@ export async function savePractice(data: {
         difficulty: data.difficulty,
         question: data.question,
         userAnswer: data.userAnswer,
-        aiFeedback: data.aiFeedback ?? null,
+        aiFeedback: (data.aiFeedback ?? Prisma.JsonNull) as Prisma.InputJsonValue,
         score: data.score ?? null,
       },
     });
@@ -128,11 +129,12 @@ export async function getInterviewNotes(interviewId: string): Promise<ActionResp
 
 export async function saveInterviewNote(interviewId: string, data: { type: string; title: string; content: string }): Promise<ActionResponse<any>> {
   try {
-    const note = await prisma.interviewNote.upsert({
-      where: { interviewId_type_title: { interviewId, type: data.type, title: data.title } },
-      update: { content: data.content },
-      create: { interviewId, type: data.type, title: data.title, content: data.content },
+    const existing = await prisma.interviewNote.findFirst({
+      where: { interviewId, type: data.type, title: data.title },
     });
+    const note = existing
+      ? await prisma.interviewNote.update({ where: { id: existing.id }, data: { content: data.content } })
+      : await prisma.interviewNote.create({ data: { interviewId, type: data.type, title: data.title, content: data.content } });
     return { success: true, data: note };
   } catch {
     const note = await prisma.interviewNote.create({

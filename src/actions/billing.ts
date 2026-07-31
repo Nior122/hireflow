@@ -52,14 +52,17 @@ export async function trackUsage(feature: string, count: number = 1): Promise<Ac
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    await prisma.usageRecord.upsert({
-      where: { userId_feature_date: { userId: user.id, feature, date: today } } as unknown as { userId_feature_date: { userId: string; feature: string; date: Date } },
-      update: { count: { increment: count } },
-      create: { userId: user.id, feature, count },
-    }).catch(async () => {
-      // If unique constraint fails, create new record
-      await prisma.usageRecord.create({ data: { userId: user.id, feature, count } });
+    const existing = await prisma.usageRecord.findFirst({
+      where: { userId: user.id, feature, date: today },
     });
+    if (existing) {
+      await prisma.usageRecord.update({
+        where: { id: existing.id },
+        data: { count: { increment: count } },
+      });
+    } else {
+      await prisma.usageRecord.create({ data: { userId: user.id, feature, count, date: today } });
+    }
 
     return { success: true, data: undefined };
   } catch { return { success: false, error: "Failed" }; }
@@ -237,12 +240,12 @@ export async function getAdminStats(): Promise<ActionResponse<any>> {
     const [orgs, users, subscriptions, apiKeys] = await Promise.all([
       prisma.organization.count(),
       prisma.user.count(),
-      prisma.subscription.groupBy({ by: ["plan"] }),
+      prisma.subscription.groupBy({ by: ["plan"], _count: { plan: true } }),
       prisma.apiKey.count({ where: { revokedAt: null } }),
     ]);
 
     const planCounts: Record<string, number> = {};
-    subscriptions.forEach((s: { plan: string; _count: { plan: number } }) => { planCounts[s.plan] = s._count.plan; });
+    subscriptions.forEach((s) => { planCounts[s.plan] = s._count.plan; });
 
     return {
       success: true,
@@ -251,9 +254,9 @@ export async function getAdminStats(): Promise<ActionResponse<any>> {
         totalUsers: users,
         subscriptionsByPlan: planCounts,
         activeApiKeys: apiKeys,
-        totalRevenue: subscriptions.reduce((s: number, sub: { plan: string; _count: { plan: number } }) => {
+        totalRevenue: subscriptions.reduce((acc: number, sub) => {
           const plan = getPlan(sub.plan);
-          return s + (plan.priceMonthly * sub._count.plan);
+          return acc + (plan.priceMonthly * sub._count.plan);
         }, 0),
       },
     };

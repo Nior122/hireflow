@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { prisma, Prisma } from "@/lib/prisma";
 import { createOrGetUser } from "@/lib/clerk";
 import type { ActionResponse } from "@/lib/types";
 
@@ -99,7 +99,7 @@ export async function addMessage(conversationId: string, role: string, content: 
     if (!conv) return { success: false, error: "Conversation not found" };
 
     const message = await prisma.conversationMessage.create({
-      data: { conversationId, role, content, metadata: metadata ?? null },
+      data: { conversationId, role, content, metadata: metadata !== undefined ? metadata as Prisma.InputJsonValue : Prisma.JsonNull },
     });
 
     // Update conversation timestamp

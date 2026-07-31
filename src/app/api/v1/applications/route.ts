@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, Prisma } from "@/lib/prisma";
 import { authenticateApiKey, hasScope, paginateParams, jsonPaginated } from "@/lib/api/auth";
 import { createApplicationSchema } from "@/lib/validation/schemas";
 import { sanitizeInput } from "@/lib/security/sanitize";
@@ -12,8 +12,8 @@ export async function GET(req: NextRequest) {
   const status = req.nextUrl.searchParams.get("status");
   const search = req.nextUrl.searchParams.get("search");
 
-  const where: { userId: string; status?: string; OR?: Array<{ company?: { contains: string; mode: string }; role?: { contains: string; mode: string } }> } = { userId: auth.userId! };
-  if (status) where.status = status;
+  const where: Prisma.JobApplicationWhereInput = { userId: auth.userId! };
+  if (status) where.status = status as Prisma.EnumStatusFilter;
   if (search) where.OR = [{ company: { contains: search, mode: "insensitive" } }, { role: { contains: search, mode: "insensitive" } }];
 
   const [data, total] = await Promise.all([

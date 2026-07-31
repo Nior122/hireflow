@@ -16,7 +16,6 @@ const AdzunaResponseSchema = z.object({
     redirect_url: z.string(),
     contract_type: z.string().nullable().optional(),
     created: z.string(),
-    company: z.object({ display_name: z.string() }),
   })),
 });
 

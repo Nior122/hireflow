@@ -1,9 +1,10 @@
 'use server';
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { prisma, Prisma } from "@/lib/prisma";
 import { createOrGetUser } from "@/lib/clerk";
 import type { ActionResponse } from "@/lib/types";
+import type { ResumeSectionType } from "@prisma/client";
 
 // ─── Resume CRUD ────────────────────────────────────────────────
 
@@ -90,7 +91,7 @@ export async function duplicateResume(id: string): Promise<ActionResponse<any>> 
         title: original.title,
         summary: original.summary,
         sections: {
-          create: original.sections.map((s: { type: string; title: string; order: number; content: Record<string, unknown> }) => ({ type: s.type, title: s.title, order: s.order, content: s.content })),
+          create: original.sections.map((s) => ({ type: s.type, title: s.title, order: s.order, content: s.content as Prisma.InputJsonValue })),
         },
       },
       include: { sections: { orderBy: { order: "asc" } }, versions: true },
@@ -123,7 +124,7 @@ export async function updateSection(id: string, data: { title?: string; content?
     if (!section) return { success: false, error: "Section not found" };
     if (section.resume.userId !== user.id) return { success: false, error: "Not authorized" };
 
-    const updated = await prisma.resumeSection.update({ where: { id }, data: { title: data.title, content: data.content, order: data.order } });
+    const updated = await prisma.resumeSection.update({ where: { id }, data: { title: data.title, content: data.content as Prisma.InputJsonValue, order: data.order } });
     revalidatePath("/dashboard/resume");
     return { success: true, data: updated };
   } catch { return { success: false, error: "Failed to update section" }; }
@@ -209,12 +210,12 @@ export async function restoreVersion(versionId: string): Promise<ActionResponse<
     const user = await createOrGetUser();
     const version = await prisma.resumeVersion.findUnique({
       where: { id: versionId },
-      select: { resumeId: true, resume: { select: { userId: true } } },
+      select: { resumeId: true, snapshot: true, resume: { select: { userId: true } } },
     });
     if (!version) return { success: false, error: "Version not found" };
     if (version.resume.userId !== user.id) return { success: false, error: "Not authorized" };
 
-    const snapshot = version.snapshot as { name?: string; title?: string; summary?: string; sections?: Array<{ type: string; title: string; order: number; content: unknown }> };
+    const snapshot = version.snapshot as unknown as { name?: string; title?: string; summary?: string; sections?: Array<{ type: string; title: string; order: number; content: unknown }> };
     await prisma.resume.update({
       where: { id: version.resumeId },
       data: { name: snapshot.name, title: snapshot.title, summary: snapshot.summary },
@@ -224,7 +225,7 @@ export async function restoreVersion(versionId: string): Promise<ActionResponse<
       await prisma.resumeSection.deleteMany({ where: { resumeId: version.resumeId } });
       for (const section of snapshot.sections) {
         await prisma.resumeSection.create({
-          data: { resumeId: version.resumeId, type: section.type, title: section.title, order: section.order, content: section.content },
+          data: { resumeId: version.resumeId, type: section.type as ResumeSectionType, title: section.title, order: section.order, content: section.content as Prisma.InputJsonValue },
         });
       }
     }

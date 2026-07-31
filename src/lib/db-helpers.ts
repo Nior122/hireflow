@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import type { Status, CandidateStatus } from "@prisma/client";
 
 /**
  * Get the next position for a record in a Kanban column.
@@ -13,15 +14,23 @@ import { prisma } from "./prisma";
 export async function getNextPosition(
   tableName: "jobApplication" | "candidate",
   userId: string,
-  status: string,
+  status: Status | CandidateStatus | string,
   userIdField: string = "userId"
 ): Promise<number> {
-  const table = prisma[tableName as "jobApplication" | "candidate"];
-  const lastRecord = await table.findFirst({
-    where: { [userIdField]: userId, status },
-    orderBy: { position: "desc" },
-    select: { position: true },
-  });
+  let lastRecord: { position: number } | null = null;
+  if (tableName === "jobApplication") {
+    lastRecord = await prisma.jobApplication.findFirst({
+      where: { userId, status: status as Status },
+      orderBy: { position: "desc" },
+      select: { position: true },
+    });
+  } else if (tableName === "candidate") {
+    lastRecord = await prisma.candidate.findFirst({
+      where: { employerId: userId, status: status as CandidateStatus },
+      orderBy: { position: "desc" },
+      select: { position: true },
+    });
+  }
   return (lastRecord?.position ?? -1) + 1;
 }
 

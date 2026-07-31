@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, Prisma } from "@/lib/prisma";
 import { authenticateApiKey, hasScope, paginateParams, jsonPaginated } from "@/lib/api/auth";
 
 export async function GET(req: NextRequest) {
@@ -8,11 +8,11 @@ export async function GET(req: NextRequest) {
 
   const { page, limit, offset } = paginateParams(req);
   const status = req.nextUrl.searchParams.get("status");
-  const where: { employerId: string; status?: string } = { employerId: auth.userId! };
-  if (status) where.status = status;
+  const where: Prisma.CandidateWhereInput = { employerId: auth.userId! };
+  if (status) where.status = status as Prisma.EnumCandidateStatusFilter;
 
   const [data, total] = await Promise.all([
-    prisma.candidate.findMany({ where, orderBy: { createdAt: "desc" }, skip: offset, take: limit }),
+    prisma.candidate.findMany({ where, orderBy: { appliedAt: "desc" }, skip: offset, take: limit }),
     prisma.candidate.count({ where }),
   ]);
 

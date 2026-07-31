@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { prisma, Prisma } from "@/lib/prisma";
 import { createOrGetUser } from "@/lib/clerk";
 import { logActivity } from "@/actions/activities";
 import { AiMatchResultSchema, type JobResult, type ActionResponse, type SavedJobData, type AiMatchResult } from "@/lib/types";
@@ -23,7 +23,7 @@ function createSavedJobData(userId: string, job: JobResult, importedToKanban: bo
     salaryCurrency: job.salaryCurrency ?? null,
     description: job.description ?? null,
     requirements: job.requirements ?? null,
-    skills: job.skills ?? null,
+    skills: job.skills != null ? job.skills as Prisma.InputJsonValue : Prisma.JsonNull,
     companyLogo: job.companyLogo ?? null,
     companyWebsite: job.companyWebsite ?? null,
     applicationUrl: job.applicationUrl ?? null,

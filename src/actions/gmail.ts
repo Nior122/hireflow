@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { createOrGetUser } from "@/lib/clerk";
 import { classifyEmail } from "@/lib/ai";
 import { revalidatePath } from "next/cache";
+import type { Status } from "@prisma/client";
 
 interface GmailMessage {
   id: string;
@@ -147,7 +148,7 @@ export async function importEmailAsApplication(
   try {
     const user = await createOrGetUser();
     const lastApp = await prisma.jobApplication.findFirst({
-      where: { userId: user.id, status: classification.suggestedStatus },
+      where: { userId: user.id, status: classification.suggestedStatus as Status },
       orderBy: { position: "desc" },
       select: { position: true },
     });
@@ -158,7 +159,7 @@ export async function importEmailAsApplication(
         company: classification.company ?? message.from.split("@")[0],
         role: classification.role ?? "Unknown Role",
         notes: message.body.slice(0, 2000),
-        status: classification.suggestedStatus,
+        status: classification.suggestedStatus as Status,
         source: "Email",
         sourceEmailId: message.id,
         position: (lastApp?.position ?? -1) + 1,
