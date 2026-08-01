@@ -8,10 +8,7 @@ declare global {
 }
 
 function createPrismaClient(): PrismaClient {
-  return new PrismaClient({
-    datasourceUrl: process.env.DATABASE_URL,
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-  });
+  return new PrismaClient();
 }
 
 // Lazy singleton — only constructed on first property access, never at import time.
