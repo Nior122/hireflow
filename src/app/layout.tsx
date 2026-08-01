@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "@/components/Providers";
 import { assertEnv, getEnvStatusHtml } from "@/lib/validate-env";
 
@@ -79,10 +80,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#2563eb" />
       </head>
       <body className="min-h-full flex flex-col">
-        {envBanner && (
-          <div dangerouslySetInnerHTML={{ __html: envBanner }} />
-        )}
-        <Providers>{children}</Providers>
+        <ClerkProvider>
+          {envBanner && (
+            <div dangerouslySetInnerHTML={{ __html: envBanner }} />
+          )}
+          <Providers>{children}</Providers>
+        </ClerkProvider>
       </body>
     </html>
   );
