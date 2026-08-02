@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
-import { Zap, Bell, CalendarClock, Check, Search, LayoutGrid, Bot, FileText, Video, BarChart3 } from "lucide-react";
+import { Zap, Bell, CalendarClock, Check, Search, LayoutGrid, Bot, FileText, Video, BarChart3, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { formatDistanceToNow, isPast } from "date-fns";
@@ -125,7 +125,20 @@ export function Header() {
             </DropdownMenuContent>
           </DropdownMenu>
           <ThemeToggle />
-          <UserButton />
+          <Link href="/dashboard/settings" title="Settings">
+            <Button variant={pathname?.startsWith("/dashboard/settings") ? "secondary" : "ghost"} size="icon">
+              <Settings className="h-5 w-5" />
+            </Button>
+          </Link>
+          <UserButton>
+            <UserButton.MenuItems>
+              <UserButton.Link
+                label="Settings"
+                labelIcon={<Settings className="h-4 w-4" />}
+                href="/dashboard/settings"
+              />
+            </UserButton.MenuItems>
+          </UserButton>
         </div>
       </div>
     </header>

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { scanInbox, classifyEmails, importEmailAsApplication, getGmailStatus, disconnectGmail } from "@/actions/gmail";
+import { X } from "lucide-react";
 
 interface ClassifiedEmail {
   message: { id: string; subject: string; from: string; body: string; date: string };
@@ -23,6 +24,7 @@ interface ClassifiedEmail {
 
 export function EmailDigestPanel() {
   const [emails, setEmails] = useState<ClassifiedEmail[]>([]);
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [importing, startImport] = useTransition();
@@ -167,7 +169,7 @@ export function EmailDigestPanel() {
       )}
 
       <div className="space-y-3">
-        {emails.map((email, i) => (
+        {emails.filter(e => !dismissedIds.has(e.message.id)).map((email, i) => (
           <motion.div key={email.message.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
             <Card className={importedIds.has(email.message.id) ? "opacity-50" : ""}>
               <CardContent className="p-4">
@@ -184,9 +186,14 @@ export function EmailDigestPanel() {
                   </div>
                   <div className="flex gap-1">
                     {!importedIds.has(email.message.id) ? (
-                      <Button size="icon-xs" onClick={() => handleImport(email)} disabled={importing}>
-                        {importing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                      </Button>
+                      <>
+                        <Button size="icon-xs" onClick={() => handleImport(email)} disabled={importing} title="Import as application">
+                          {importing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                        </Button>
+                        <Button size="icon-xs" variant="ghost" onClick={() => setDismissedIds(prev => new Set([...prev, email.message.id]))} title="Dismiss email">
+                          <X className="h-3 w-3 text-muted-foreground" />
+                        </Button>
+                      </>
                     ) : (
                       <Badge className="text-[10px]">Imported</Badge>
                     )}

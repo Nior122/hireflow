@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { KanbanColumn } from "./KanbanColumn";
 import { KanbanCard } from "./KanbanCard";
 import { AddApplicationDialog } from "./AddApplicationDialog";
+import { ExportButton } from "./ExportButton";
 import { moveApplication } from "@/actions/applications";
 import { STATUS_ORDER, STATUS_LABELS, type ApplicationCard, type ApplicationStatus } from "@/lib/types";
 
@@ -86,7 +87,10 @@ export function KanbanBoard({ initialApplications }: KanbanBoardProps) {
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1">Track and manage your job applications</p>
         </div>
-        <AddApplicationDialog />
+        <div className="flex items-center gap-2">
+          <ExportButton />
+          <AddApplicationDialog />
+        </div>
       </div>
 
       {/* Mobile: Horizontal tab bar with snap scroll */}

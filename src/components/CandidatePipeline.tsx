@@ -93,13 +93,34 @@ export function CandidatePipeline({ initialCandidates }: Props) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [schedulingCandidate, setSchedulingCandidate] = useState<CandidateCard | null>(null);
   const [schedulingOpen, setSchedulingOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+
+  // Extract all unique tags
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of candidates) {
+      for (const t of c.tags) set.add(t);
+    }
+    return Array.from(set);
+  }, [candidates]);
+
+  // Filter candidates by search and tag
+  const filteredCandidates = useMemo(() => {
+    return candidates.filter(c => {
+      const q = search.toLowerCase();
+      const matchesSearch = !q || c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q) || c.positionApplied.toLowerCase().includes(q);
+      const matchesTag = !selectedTag || c.tags.includes(selectedTag);
+      return matchesSearch && matchesTag;
+    });
+  }, [candidates, search, selectedTag]);
 
   const columns = useMemo(() => {
     const grouped: Record<string, CandidateCard[]> = {};
     for (const s of CANDIDATE_STATUS_ORDER) grouped[s] = [];
-    for (const c of candidates) if (grouped[c.status]) grouped[c.status].push(c);
+    for (const c of filteredCandidates) if (grouped[c.status]) grouped[c.status].push(c);
     return grouped;
-  }, [candidates]);
+  }, [filteredCandidates]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
@@ -165,28 +186,63 @@ export function CandidatePipeline({ initialCandidates }: Props) {
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {CANDIDATE_STATUS_ORDER.map(status => (
-          <PipelineColumn key={status} status={status} candidates={columns[status]} isOver={overColumn === status} onSelectCandidate={handleSelectCandidate} />
-        ))}
-      </div>
-      <DragOverlay>
-        {activeCard ? <div className="rotate-3 scale-105"><CandidateCardItem candidate={activeCard} isDragging /></div> : null}
-      </DragOverlay>
-      {selectedCandidate && (
-        <CandidateDetailDrawer candidate={selectedCandidate} open={detailOpen} onOpenChange={(open) => { setDetailOpen(open); if (!open) setSelectedCandidate(null); }} />
+    <div className="space-y-4">
+      {(allTags.length > 0 || candidates.length > 0) && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
+          <input
+            type="text"
+            placeholder="Filter candidates..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-8 w-full sm:w-64 px-3 rounded-lg border bg-background text-xs"
+          />
+          {allTags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs text-muted-foreground mr-1">Tags:</span>
+              <Badge
+                variant={selectedTag === null ? "default" : "outline"}
+                className="cursor-pointer text-[10px]"
+                onClick={() => setSelectedTag(null)}
+              >
+                All
+              </Badge>
+              {allTags.map(t => (
+                <Badge
+                  key={t}
+                  variant={selectedTag === t ? "default" : "outline"}
+                  className="cursor-pointer text-[10px]"
+                  onClick={() => setSelectedTag(selectedTag === t ? null : t)}
+                >
+                  {t}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
       )}
-      {schedulingCandidate && (
-        <SchedulingAssistant
-          candidateId={schedulingCandidate.id}
-          candidateName={schedulingCandidate.name}
-          candidateEmail={schedulingCandidate.email}
-          positionApplied={schedulingCandidate.positionApplied}
-          open={schedulingOpen}
-          onOpenChange={(open) => { setSchedulingOpen(open); if (!open) setSchedulingCandidate(null); }}
-        />
-      )}
-    </DndContext>
+      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          {CANDIDATE_STATUS_ORDER.map(status => (
+            <PipelineColumn key={status} status={status} candidates={columns[status]} isOver={overColumn === status} onSelectCandidate={handleSelectCandidate} />
+          ))}
+        </div>
+        <DragOverlay>
+          {activeCard ? <div className="rotate-3 scale-105"><CandidateCardItem candidate={activeCard} isDragging /></div> : null}
+        </DragOverlay>
+        {selectedCandidate && (
+          <CandidateDetailDrawer candidate={selectedCandidate} open={detailOpen} onOpenChange={(open) => { setDetailOpen(open); if (!open) setSelectedCandidate(null); }} />
+        )}
+        {schedulingCandidate && (
+          <SchedulingAssistant
+            candidateId={schedulingCandidate.id}
+            candidateName={schedulingCandidate.name}
+            candidateEmail={schedulingCandidate.email}
+            positionApplied={schedulingCandidate.positionApplied}
+            open={schedulingOpen}
+            onOpenChange={(open) => { setSchedulingOpen(open); if (!open) setSchedulingCandidate(null); }}
+          />
+        )}
+      </DndContext>
+    </div>
   );
 }
