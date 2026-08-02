@@ -4,9 +4,10 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Sparkles, ClipboardCheck } from "lucide-react";
+import { Sparkles, ClipboardCheck, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { seedSampleData } from "@/actions/seed";
+import { AddApplicationDialog } from "./AddApplicationDialog";
 
 export function EmptyState() {
   const router = useRouter();
@@ -41,7 +42,8 @@ export function EmptyState() {
       </motion.p>
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }} className="flex flex-col sm:flex-row items-center gap-3">
-        <Button size="lg" className="gap-2 shimmer" onClick={handleSeed} disabled={isPending}>
+        <AddApplicationDialog />
+        <Button size="lg" variant="outline" className="gap-2" onClick={handleSeed} disabled={isPending}>
           <Sparkles className="h-4 w-4" />
           {isPending ? "Loading..." : "Load Sample Jobs"}
         </Button>

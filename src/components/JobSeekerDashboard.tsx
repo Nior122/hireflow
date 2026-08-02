@@ -3,14 +3,17 @@
 import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
+import { Inbox } from "lucide-react";
 import { KanbanBoard } from "./KanbanBoard";
 import { EmptyState } from "./EmptyState";
 import { SearchFilterBar } from "./SearchFilterBar";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getApplications } from "@/actions/applications";
 import type { ApplicationCard, ApplicationStatus } from "@/lib/types";
 
 const StatsSection = dynamic(() => import("./StatsSection").then(m => ({ default: m.StatsSection })), { loading: () => <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-8">{Array.from({length:4}).map((_,i)=><Skeleton key={i} className="h-24 rounded-xl"/>)}</div> });
+const EmailDigestPanel = dynamic(() => import("./EmailDigestPanel").then(m => ({ default: m.EmailDigestPanel })), { loading: () => <Skeleton className="h-32 rounded-xl" />, ssr: false });
 
 interface Props { userId: string; }
 
@@ -18,6 +21,7 @@ export function JobSeekerDashboard({ userId }: Props) {
   const [applications, setApplications] = useState<ApplicationCard[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<{ search: string; statuses: ApplicationStatus[] }>({ search: "", statuses: [] });
+  const [showDigest, setShowDigest] = useState(false);
 
   useEffect(() => {
     getApplications().then(r => {
@@ -71,9 +75,19 @@ export function JobSeekerDashboard({ userId }: Props) {
 
   if (apps.length === 0) {
     return (
-      <>
+      <div className="space-y-4">
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowDigest(!showDigest)}>
+            <Inbox className="h-4 w-4" /> Email Digest
+          </Button>
+        </div>
+        {showDigest && (
+          <div className="mb-4 p-4 rounded-xl border bg-card">
+            <EmailDigestPanel />
+          </div>
+        )}
         <EmptyState />
-      </>
+      </div>
     );
   }
 
@@ -81,6 +95,17 @@ export function JobSeekerDashboard({ userId }: Props) {
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+      <div className="flex items-center justify-between mb-4">
+        <div />
+        <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowDigest(!showDigest)}>
+          <Inbox className="h-4 w-4" /> Email Digest
+        </Button>
+      </div>
+      {showDigest && (
+        <div className="mb-6 p-4 rounded-xl border bg-card">
+          <EmailDigestPanel />
+        </div>
+      )}
       <StatsSection applications={apps} />
       <SearchFilterBar applications={apps} onFilterChange={handleFilterChange} />
       {isFiltering && filteredApps.length === 0 ? (

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { formatDistanceToNow, isPast } from "date-fns";
 import { Bell, Star, Users, BarChart3, Mail } from "lucide-react";
 import { getApplications } from "@/actions/applications";
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function CopilotContextPanel({ role }: Props) {
+  const router = useRouter();
   const [apps, setApps] = useState<ApplicationCard[]>([]);
   const [reminders, setReminders] = useState<any[]>([]);
   const [savedJobs, setSavedJobs] = useState<any[]>([]);
@@ -157,18 +159,18 @@ export function CopilotContextPanel({ role }: Props) {
           <div>
             <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Quick Actions</h4>
             <div className="space-y-1">
-              <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors">
+              <button onClick={() => router.push("/dashboard")} className="w-full flex items-center gap-2 p-2 rounded-lg bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors text-left">
                 <Mail className="h-3 w-3 text-primary" />
-                <span className="text-xs">Review pending replies</span>
-              </div>
-              <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors">
+                <span className="text-xs">Email digest & inbox</span>
+              </button>
+              <button onClick={() => router.push("/dashboard")} className="w-full flex items-center gap-2 p-2 rounded-lg bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors text-left">
                 <Users className="h-3 w-3 text-primary" />
-                <span className="text-xs">View new candidates</span>
-              </div>
-              <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors">
+                <span className="text-xs">View candidate pipeline</span>
+              </button>
+              <button onClick={() => router.push("/dashboard/analytics")} className="w-full flex items-center gap-2 p-2 rounded-lg bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors text-left">
                 <BarChart3 className="h-3 w-3 text-primary" />
-                <span className="text-xs">Hiring metrics</span>
-              </div>
+                <span className="text-xs">Hiring metrics & analytics</span>
+              </button>
             </div>
           </div>
         </>
