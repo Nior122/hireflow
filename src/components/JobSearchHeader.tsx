@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import type { JobSearchParams, RemoteType, JobSort } from "@/lib/types";
 
 interface Props {
@@ -20,7 +19,7 @@ export function JobSearchHeader({ onSearch, loading }: Props) {
   const [remote, setRemote] = useState<RemoteType>("any");
   const [salary, setSalary] = useState("");
   const [jobType, setJobType] = useState("");
-  const [datePosted, setDatePosted] = useState("");
+  const [datePosted] = useState("");
   const [sort, setSort] = useState<JobSort>("newest");
   const [showFilters, setShowFilters] = useState(false);
 

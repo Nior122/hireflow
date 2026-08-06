@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { getTagColor } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { updateCandidateRating, addCandidateNote, generateCandidateReply } from "@/actions/candidates";
@@ -79,10 +80,22 @@ export function CandidateDetailDrawer({ candidate, open, onOpenChange }: Props) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle>
             {candidate.name}
-            {candidate.tags.map((t, i) => <Badge key={i} variant="secondary" className="text-[10px]">{t}</Badge>)}
           </DialogTitle>
+          <div className="mt-4">
+            <h4 className="text-xs font-semibold mb-2">Tags</h4>
+            <div className="flex flex-wrap gap-1">
+              {candidate.tags.map((t, i) => {
+                const colors = getTagColor(t);
+                return (
+                  <Badge key={i} variant="secondary" className="text-[10px] border" style={{ backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}>
+                    {t}
+                  </Badge>
+                );
+              })}
+            </div>
+          </div>
         </DialogHeader>
 
         <div className="space-y-6">

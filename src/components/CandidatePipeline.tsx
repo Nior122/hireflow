@@ -11,7 +11,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Star, Mail } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { cn, getTagColor } from "@/lib/utils";
 import { CANDIDATE_STATUS_LABELS, CANDIDATE_STATUS_COLORS, CANDIDATE_STATUS_ORDER, type CandidateCard, type CandidateStatus } from "@/lib/types";
 import { moveCandidate } from "@/actions/candidates";
 import { CandidateDetailDrawer } from "./CandidateDetailDrawer";
@@ -51,9 +51,14 @@ function CandidateCardItem({ candidate, isDragging, onClick }: { candidate: Cand
         </div>
         {candidate.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
-            {candidate.tags.slice(0, 3).map(tag => (
-              <Badge key={tag} variant="secondary" className="text-[9px] px-1.5 py-0">{tag}</Badge>
-            ))}
+            {candidate.tags.slice(0, 3).map(tag => {
+              const colors = getTagColor(tag);
+              return (
+                <Badge key={tag} variant="secondary" className="text-[9px] px-1.5 py-0 border" style={{ backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}>
+                  {tag}
+                </Badge>
+              );
+            })}
           </div>
         )}
       </CardContent>
@@ -206,16 +211,20 @@ export function CandidatePipeline({ initialCandidates }: Props) {
               >
                 All
               </Badge>
-              {allTags.map(t => (
-                <Badge
-                  key={t}
-                  variant={selectedTag === t ? "default" : "outline"}
-                  className="cursor-pointer text-[10px]"
-                  onClick={() => setSelectedTag(selectedTag === t ? null : t)}
-                >
-                  {t}
-                </Badge>
-              ))}
+              {allTags.map(t => {
+                const colors = getTagColor(t);
+                return (
+                  <Badge
+                    key={t}
+                    variant={selectedTag === t ? "default" : "outline"}
+                    className="cursor-pointer text-[10px] border"
+                    style={selectedTag === t ? { backgroundColor: colors.text, color: '#fff', borderColor: colors.text } : { backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}
+                    onClick={() => setSelectedTag(selectedTag === t ? null : t)}
+                  >
+                    {t}
+                  </Badge>
+                );
+              })}
             </div>
           )}
         </div>

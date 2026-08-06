@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { Users, Plus, Mail, Clock, BarChart3 } from "lucide-react";
+import { Users, Plus, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,8 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { getOrganizations, createOrganization, getOrganization, inviteMember, getMembers, getAuditLogs, getJobPostings, createJobPosting } from "@/actions/organizations";
+import { getOrganizations, createOrganization, getOrganization, inviteMember, getAuditLogs, getJobPostings, createJobPosting } from "@/actions/organizations";
 import type { OrgRole } from "@/lib/org/permissions";
+
+interface OrgSummary { id: string; name: string; slug: string; }
+interface OrgMember { id: string; role: string; joinedAt: string; user?: { email: string } }
+interface AuditLog { id: string; action: string; entity: string; createdAt: string; user?: { email: string } }
+interface JobPosting { id: string; title: string; status: string; department?: string; location?: string }
+interface OrgDetail extends OrgSummary { members?: OrgMember[]; myRole?: string; }
 
 const ROLE_LABELS: Record<string, string> = {
   OWNER: "Owner", ADMIN: "Admin", RECRUITER: "Recruiter",
@@ -29,8 +35,8 @@ const ROLE_COLORS: Record<string, string> = {
 type Tab = "overview" | "team" | "jobs" | "audit";
 
 export function TeamDashboard() {
-  const [orgs, setOrgs] = useState<any[]>([]);
-  const [currentOrg, setCurrentOrg] = useState<any>(null);
+  const [orgs, setOrgs] = useState<OrgSummary[]>([]);
+  const [currentOrg, setCurrentOrg] = useState<OrgDetail | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -39,19 +45,19 @@ export function TeamDashboard() {
   const [newOrgSlug, setNewOrgSlug] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("RECRUITER");
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [jobPostings, setJobPostings] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [jobPostings, setJobPostings] = useState<JobPosting[]>([]);
 
-  useEffect(() => { loadOrgs(); }, []);
-
-  async function loadOrgs() {
+  const loadOrgs = useCallback(async () => {
     const res = await getOrganizations();
     if (res.success && res.data) {
-      setOrgs(res.data);
+      setOrgs(res.data as OrgSummary[]);
       if (res.data.length > 0) loadOrgDetail(res.data[0].id);
     }
     setLoading(false);
-  }
+  }, []);
+
+  useEffect(() => { loadOrgs(); }, [loadOrgs]);
 
   async function loadOrgDetail(orgId: string) {
     const [orgRes, auditRes, jobsRes] = await Promise.all([
@@ -155,7 +161,7 @@ export function TeamDashboard() {
           <div>
             <h3 className="font-semibold text-sm mb-3">Team Members</h3>
             <div className="flex flex-wrap gap-2">
-              {members.map((m: any) => (
+              {members.map((m: OrgMember) => (
                 <div key={m.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border">
                   <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
                     {(m.user?.email ?? "?")[0].toUpperCase()}
@@ -174,7 +180,7 @@ export function TeamDashboard() {
             <div>
               <h3 className="font-semibold text-sm mb-3">Recent Activity</h3>
               <div className="space-y-2">
-                {auditLogs.slice(0, 5).map((log: any) => (
+                {auditLogs.slice(0, 5).map((log: AuditLog) => (
                   <div key={log.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30">
                     <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-bold text-primary">{(log.user?.email ?? "?")[0].toUpperCase()}</div>
                     <div className="flex-1"><p className="text-xs">{log.action.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())}</p></div>
@@ -194,7 +200,7 @@ export function TeamDashboard() {
             <Button size="sm" onClick={() => setInviteOpen(true)} className="gap-1"><Mail className="h-3 w-3" /> Invite Member</Button>
           </div>
           <div className="space-y-2">
-            {members.map((m: any) => (
+            {members.map((m: OrgMember) => (
               <Card key={m.id}>
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -218,13 +224,13 @@ export function TeamDashboard() {
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="font-semibold text-sm">Job Postings ({jobPostings.length})</h3>
-            <CreateJobPostingButton orgId={currentOrg?.id} onCreated={() => loadOrgDetail(currentOrg.id)} />
+            <CreateJobPostingButton orgId={currentOrg?.id ?? ""} onCreated={() => loadOrgDetail(currentOrg?.id ?? "")} />
           </div>
           {jobPostings.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No job postings yet</p>
           ) : (
             <div className="space-y-2">
-              {jobPostings.map((job: any) => (
+              {jobPostings.map((job: JobPosting) => (
                 <Card key={job.id}>
                   <CardContent className="p-4 flex items-center justify-between">
                     <div>
@@ -246,7 +252,7 @@ export function TeamDashboard() {
           {auditLogs.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No activity yet</p>
           ) : (
-            auditLogs.map((log: any) => (
+            auditLogs.map((log: AuditLog) => (
               <Card key={log.id}>
                 <CardContent className="p-3 flex items-center gap-3">
                   <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-bold text-primary">{(log.user?.email ?? "?")[0].toUpperCase()}</div>

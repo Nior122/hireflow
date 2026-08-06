@@ -59,7 +59,10 @@ export function JobDetailDrawer({ job, isOpen, onClose, isSaved, onJobSaved, onJ
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1 min-w-0">
               {job.companyLogo ? (
-                <img src={job.companyLogo} alt="" className="h-10 w-10 rounded-lg object-cover bg-muted flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={job.companyLogo} alt="" className="h-10 w-10 rounded-lg object-cover bg-muted flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                </>
               ) : (
                 <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <Building2 className="h-5 w-5 text-primary/60" />
@@ -70,7 +73,7 @@ export function JobDetailDrawer({ job, isOpen, onClose, isSaved, onJobSaved, onJ
                 <p className="text-sm text-muted-foreground truncate">{job.company}</p>
               </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close"><X className="h-4 w-4" /></Button>
           </div>
         </div>
 

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useCallback } from "react";
 import { useUser, useClerk } from "@clerk/nextjs";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import {
@@ -24,13 +24,11 @@ import {
   ShieldCheck,
   Unplug,
   Bell,
-  RefreshCw,
-  AlertTriangle,
+  LayoutDashboard,
   Lock,
   History,
-  Building,
   CheckCircle2,
-  XCircle
+  RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -56,9 +54,10 @@ import { getSubscription, openBillingPortal } from "@/actions/billing";
 import { getCareerScore } from "@/actions/copilot";
 import { getApiKeys, createApiKey, revokeApiKey, type ApiKeyItem } from "@/actions/api-keys";
 import { getNotificationPreferences, updateNotificationPreferences, type NotificationPreferences } from "@/actions/notifications";
+import { getDashboardWidgets, updateDashboardWidgets, type DashboardWidgets } from "@/actions/widgets";
 import { GROQ_MODEL } from "@/lib/ai-config";
 
-type SettingsTab = "profile" | "integrations" | "ai" | "billing" | "apikeys" | "notifications" | "appearance";
+type SettingsTab = "profile" | "integrations" | "ai" | "billing" | "apikeys" | "preferences" | "appearance";
 
 interface SubscriptionData {
   id: string;
@@ -116,21 +115,24 @@ export function SettingsDashboard() {
     weeklyDigest: false,
     marketingEmails: false,
   });
-  const [isPendingNotif, startNotifTransition] = useTransition();
+  const [widgets, setWidgets] = useState<DashboardWidgets>({
+    showStats: true,
+    showEmailDigest: false,
+    showUpcomingInterviews: true,
+    showSkillGaps: false,
+  });
+  const [isPendingPrefs, startPrefsTransition] = useTransition();
 
-  useEffect(() => {
-    loadSettingsData();
-  }, []);
-
-  async function loadSettingsData() {
+  const loadSettingsData = useCallback(async () => {
     setLoading(true);
-    const [gmailRes, calRes, subRes, scoreRes, keysRes, notifRes] = await Promise.all([
+    const [gmailRes, calRes, subRes, scoreRes, keysRes, notifRes, widgetsRes] = await Promise.all([
       getGmailStatus(),
       getCalendarStatus(),
       getSubscription(),
       getCareerScore(),
       getApiKeys(),
       getNotificationPreferences(),
+      getDashboardWidgets(),
     ]);
 
     if (gmailRes.success && gmailRes.data) setGmailConnected(gmailRes.data.connected);
@@ -139,9 +141,14 @@ export function SettingsDashboard() {
     if (scoreRes.success && scoreRes.data) setCareerScore(scoreRes.data as CareerScoreData);
     if (keysRes.success && keysRes.data) setApiKeys(keysRes.data);
     if (notifRes.success && notifRes.data) setNotifications(notifRes.data);
+    if (widgetsRes.success && widgetsRes.data) setWidgets(widgetsRes.data);
 
     setLoading(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    loadSettingsData();
+  }, [loadSettingsData]);
 
   async function handleDisconnectGmail() {
     setConfirmDisconnectGmail(false);
@@ -208,15 +215,30 @@ export function SettingsDashboard() {
 
   function handleToggleNotification(key: keyof NotificationPreferences) {
     const updated = { ...notifications, [key]: !notifications[key] };
-    setNotifications(updated); // Optimistic update
+    setNotifications(updated);
 
-    startNotifTransition(async () => {
+    startPrefsTransition(async () => {
       const res = await updateNotificationPreferences(updated);
       if (res.success) {
         toast.success("Notification preferences saved");
       } else {
         toast.error(res.error ?? "Failed to save preferences");
-        setNotifications(notifications); // Revert on failure
+        setNotifications(notifications);
+      }
+    });
+  }
+
+  function handleToggleWidget(key: keyof DashboardWidgets) {
+    const updated = { ...widgets, [key]: !widgets[key] };
+    setWidgets(updated);
+
+    startPrefsTransition(async () => {
+      const res = await updateDashboardWidgets(updated);
+      if (res.success) {
+        toast.success("Dashboard widget preferences saved");
+      } else {
+        toast.error(res.error ?? "Failed to save widget preferences");
+        setWidgets(widgets);
       }
     });
   }
@@ -257,7 +279,7 @@ export function SettingsDashboard() {
               { id: "ai", label: "AI & Copilot", icon: Bot },
               { id: "billing", label: "Billing & Plans", icon: CreditCard },
               { id: "apikeys", label: "API Keys", icon: Key },
-              { id: "notifications", label: "Notifications", icon: Bell },
+              { id: "preferences", label: "Preferences", icon: Bell },
               { id: "appearance", label: "Appearance", icon: SunMoon },
             ].map(item => {
               const Icon = item.icon;
@@ -293,7 +315,10 @@ export function SettingsDashboard() {
                 <CardContent className="space-y-6">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 rounded-xl border bg-muted/20">
                     {user?.imageUrl ? (
-                      <img src={user.imageUrl} alt="Avatar" className="w-16 h-16 rounded-full border shadow-sm object-cover" />
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={user.imageUrl} alt="Avatar" className="w-16 h-16 rounded-full border shadow-sm object-cover" />
+                      </>
                     ) : (
                       <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center font-bold text-xl text-primary">
                         {user?.firstName?.[0] ?? "U"}
@@ -622,12 +647,12 @@ export function SettingsDashboard() {
             </motion.div>
           )}
 
-          {/* NOTIFICATIONS TAB */}
-          {activeTab === "notifications" && (
+          {/* PREFERENCES TAB */}
+          {activeTab === "preferences" && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2"><Bell className="h-5 w-5 text-primary" /> Notification Preferences</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2"><Bell className="h-5 w-5 text-primary" /> Notifications & Alerts</CardTitle>
                   <CardDescription>Control email alerts and application reminder notifications</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -649,8 +674,49 @@ export function SettingsDashboard() {
                         <button
                           role="switch"
                           aria-checked={isChecked}
-                          disabled={isPendingNotif}
+                          disabled={isPendingPrefs}
                           onClick={() => handleToggleNotification(k)}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            isChecked ? "bg-primary" : "bg-muted"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-background shadow-lg ring-0 transition duration-200 ease-in-out ${
+                              isChecked ? "translate-x-5" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2"><LayoutDashboard className="h-5 w-5 text-primary" /> Dashboard Widgets</CardTitle>
+                  <CardDescription>Customize which widgets appear on your main dashboard</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {[
+                    { key: "showStats", title: "Statistics Summary", desc: "Show your application metrics at the top of the dashboard" },
+                    { key: "showEmailDigest", title: "Email Digest", desc: "Show the email inbox scanner by default" },
+                    { key: "showUpcomingInterviews", title: "Upcoming Interviews", desc: "Show your scheduled interviews for the week" },
+                    { key: "showSkillGaps", title: "Skill Gap Analysis", desc: "Show AI insights into missing skills" },
+                  ].map(item => {
+                    const k = item.key as keyof DashboardWidgets;
+                    const isChecked = widgets[k];
+                    return (
+                      <div key={k} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-medium">{item.title}</p>
+                          <p className="text-xs text-muted-foreground">{item.desc}</p>
+                        </div>
+                        <button
+                          role="switch"
+                          aria-checked={isChecked}
+                          disabled={isPendingPrefs}
+                          onClick={() => handleToggleWidget(k)}
                           className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                             isChecked ? "bg-primary" : "bg-muted"
                           }`}

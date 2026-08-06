@@ -147,6 +147,15 @@ export async function importEmailAsApplication(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const user = await createOrGetUser();
+
+    // DUPLICATE DETECTION
+    const existing = await prisma.jobApplication.findFirst({
+      where: { userId: user.id, sourceEmailId: message.id }
+    });
+    if (existing) {
+      return { success: false, error: "Email already imported." };
+    }
+
     const lastApp = await prisma.jobApplication.findFirst({
       where: { userId: user.id, status: classification.suggestedStatus as Status },
       orderBy: { position: "desc" },
@@ -174,4 +183,40 @@ export async function importEmailAsApplication(
     revalidatePath("/dashboard");
     return { success: true };
   } catch { return { success: false, error: "Failed to import application" }; }
+}
+
+export async function archiveEmail(messageId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const user = await createOrGetUser();
+    const accessToken = await getValidAccessToken(user.id);
+    if (!accessToken) return { success: false, error: "Gmail not connected" };
+
+    const response = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}/modify`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        removeLabelIds: ['UNREAD', 'INBOX']
+      })
+    });
+
+    if (!response.ok) return { success: false, error: "Failed to modify email in Gmail" };
+
+    return { success: true };
+  } catch { return { success: false, error: "Failed to archive email" }; }
+}
+
+export async function undoImportEmail(messageId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const user = await createOrGetUser();
+    await prisma.jobApplication.deleteMany({
+      where: { userId: user.id, sourceEmailId: messageId }
+    });
+    revalidatePath("/dashboard");
+    return { success: true };
+  } catch {
+    return { success: false, error: "Failed to undo import" };
+  }
 }

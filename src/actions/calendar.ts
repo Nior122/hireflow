@@ -243,3 +243,86 @@ export async function createCalendarEvent(
     };
   } catch { return { success: false, error: "Failed to create event" }; }
 }
+
+export async function updateCalendarEvent(
+  eventId: string,
+  summary: string,
+  description: string,
+  startTime: string,
+  endTime: string,
+  candidateEmail?: string
+): Promise<ActionResponse<CalendarEvent>> {
+  try {
+    const user = await createOrGetUser();
+    const accessToken = await getValidCalendarToken(user.id);
+    if (!accessToken) return { success: false, error: "Calendar not connected" };
+
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    const event: Record<string, unknown> = {
+      summary,
+      description,
+      start: { dateTime: startTime, timeZone },
+      end: { dateTime: endTime, timeZone },
+    };
+
+    if (candidateEmail) {
+      event.attendees = [{ email: candidateEmail }];
+      event.sendUpdates = "all";
+    }
+
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(event),
+      }
+    );
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      return { success: false, error: err.error?.message ?? "Failed to update calendar event" };
+    }
+
+    const updated = await response.json();
+    return {
+      success: true,
+      data: {
+        id: updated.id,
+        summary: updated.summary,
+        start: updated.start?.dateTime ?? startTime,
+        end: updated.end?.dateTime ?? endTime,
+        hangoutLink: updated.hangoutLink,
+      },
+    };
+  } catch { return { success: false, error: "Failed to update event" }; }
+}
+
+export async function deleteCalendarEvent(eventId: string): Promise<ActionResponse<void>> {
+  try {
+    const user = await createOrGetUser();
+    const accessToken = await getValidCalendarToken(user.id);
+    if (!accessToken) return { success: false, error: "Calendar not connected" };
+
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      return { success: false, error: "Failed to delete calendar event" };
+    }
+
+    return { success: true, data: undefined };
+  } catch { return { success: false, error: "Failed to delete event" }; }
+}
+

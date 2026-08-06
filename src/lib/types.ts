@@ -216,16 +216,20 @@ export interface SavedJobData {
 
 export interface AiMatchResult {
   matchPercentage: number;
+  matchedSkills: string[];
   missingSkills: string[];
-  strengths: string[];
-  improvements: string[];
-  interviewTips: string[];
+  prioritySkills: string[];
+  recommendedCourses: string[];
+  recommendedCertifications: string[];
+  resumeChanges: string[];
 }
 
 export const AiMatchResultSchema = z.object({
   matchPercentage: z.number().min(0).max(100),
+  matchedSkills: z.array(z.string()),
   missingSkills: z.array(z.string()),
-  strengths: z.array(z.string()),
-  improvements: z.array(z.string()),
-  interviewTips: z.array(z.string()),
+  prioritySkills: z.array(z.string()),
+  recommendedCourses: z.array(z.string()),
+  recommendedCertifications: z.array(z.string()),
+  resumeChanges: z.array(z.string()),
 });

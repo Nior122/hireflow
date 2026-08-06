@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Sparkles, ClipboardCheck, Plus } from "lucide-react";
+import { Sparkles, ClipboardCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { seedSampleData } from "@/actions/seed";
 import { AddApplicationDialog } from "./AddApplicationDialog";

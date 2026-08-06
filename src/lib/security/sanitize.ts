@@ -5,7 +5,10 @@
  */
 export function stripHtml(html: string): string {
   if (!html) return "";
-  return html.replace(/<[^>]*>/g, "").replace(/&[^;]+;/g, " ").replace(/\s+/g, " ").trim();
+  let text = html.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, "");
+  text = text.replace(/<[^>]*>/g, "");
+  text = text.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&#x27;/g, "'");
+  return text.replace(/\s+/g, " ").trim();
 }
 
 /**

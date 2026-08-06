@@ -28,10 +28,6 @@ export function CopilotSidebar({ activeId, onSelect, onNew, roleContext }: Props
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
 
-  useEffect(() => {
-    loadConversations();
-  }, []);
-
   async function loadConversations() {
     const result = await getConversations();
     if (result.success && result.data) {
@@ -43,6 +39,10 @@ export function CopilotSidebar({ activeId, onSelect, onNew, roleContext }: Props
       })));
     }
   }
+
+  useEffect(() => {
+    loadConversations();
+  }, []);
 
   async function handleNewConversation() {
     const result = await createConversation("New conversation", roleContext);

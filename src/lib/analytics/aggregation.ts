@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { differenceInDays, subDays, subMonths, startOfMonth, endOfMonth, format } from "date-fns";
+import { differenceInDays, subMonths, startOfMonth, endOfMonth, format } from "date-fns";
 
 export interface ExecutiveMetrics {
   openPositions: number;
@@ -67,8 +67,6 @@ export interface AiInsight {
 // ─── Executive Metrics ─────────────────────────────────────────
 
 export async function getExecutiveMetrics(orgId?: string): Promise<ExecutiveMetrics> {
-  const where = orgId ? { organizationId: orgId } : {};
-
   const [candidates, interviews, jobPostings] = await Promise.all([
     prisma.candidate.findMany({ where: orgId ? { employer: { orgMemberships: { some: { organizationId: orgId } } } } : {}, select: { status: true, appliedAt: true, rating: true } }),
     prisma.interview.findMany({ where: orgId ? { user: { orgMemberships: { some: { organizationId: orgId } } } } : {}, select: { status: true, createdAt: true } }),
@@ -133,7 +131,7 @@ export async function getHiringFunnel(orgId?: string): Promise<HiringFunnel[]> {
 
   const stages = ["NEW", "REVIEWED", "INTERVIEW", "OFFER", "HIRED", "REJECTED"];
   const counts = stages.map(s => candidates.filter(c => c.status === s).length);
-  const total = candidates.length || 1;
+  const _total = candidates.length || 1;
 
   return stages.map((stage, i) => ({
     stage,

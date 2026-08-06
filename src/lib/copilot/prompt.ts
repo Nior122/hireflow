@@ -11,7 +11,7 @@ export function buildSystemPrompt(context: CopilotContext): string {
   return buildJobSeekerPrompt(context, toolList, toolSchemas);
 }
 
-function buildJobSeekerPrompt(ctx: CopilotContext, tools: string, schemas: string): string {
+function buildJobSeekerPrompt(ctx: CopilotContext, tools: string, _schemas: string): string {
   const stats = ctx.stats;
   const statusSummary = stats ? Object.entries(stats.byStatus).map(([k, v]) => `${k}: ${v}`).join(", ") : "None";
 
@@ -46,7 +46,7 @@ ${tools}
 Professional but friendly. Like a senior career coach who has access to all their data.`;
 }
 
-function buildEmployerPrompt(ctx: CopilotContext, tools: string, schemas: string): string {
+function buildEmployerPrompt(ctx: CopilotContext, tools: string, _schemas: string): string {
   const stats = ctx.stats;
   const statusSummary = stats ? Object.entries(stats.byStatus).map(([k, v]) => `${k}: ${v}`).join(", ") : "None";
 

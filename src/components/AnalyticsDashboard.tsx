@@ -41,8 +41,6 @@ export function AnalyticsDashboard() {
   const [report, setReport] = useState<string | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
 
-  useEffect(() => { loadAll(); }, []);
-
   async function loadAll() {
     const [execRes, candRes, srcRes, insRes] = await Promise.all([
       getExecutiveDashboard(),
@@ -56,6 +54,8 @@ export function AnalyticsDashboard() {
     if (insRes.success) setInsights(insRes.data ?? []);
     setLoading(false);
   }
+
+  useEffect(() => { loadAll(); }, []);
 
   async function handleGenerateReport() {
     setGeneratingReport(true);

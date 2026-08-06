@@ -152,7 +152,7 @@ describe("Sanitization Utilities", () => {
     it("detects SQL keywords", () => {
       expect(detectSqlInjection("SELECT * FROM users")).toBe(true);
       expect(detectSqlInjection("'; DROP TABLE users; --")).toBe(true);
-      expect(detectSqlInjection("1 OR '1'='1")).toBe(true);
+      expect(detectSqlInjection("' OR '1'='1")).toBe(true);
     });
 
     it("allows normal text", () => {

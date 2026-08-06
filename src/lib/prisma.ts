@@ -5,8 +5,7 @@ import { Pool } from "pg";
 export { Prisma, PrismaClient };
 
 declare global {
-  // eslint-disable-next-line no-var
-  var __prisma: PrismaClient | undefined;
+  var __prisma: PrismaClient | undefined;  
 }
 
 function createPrismaClient(): PrismaClient {
@@ -25,7 +24,7 @@ export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
     if (!globalThis.__prisma) {
       globalThis.__prisma = createPrismaClient();
     }
-    const value = (globalThis.__prisma as any)[prop];
-    return typeof value === "function" ? value.bind(globalThis.__prisma) : value;
+    const value = (globalThis.__prisma as unknown as Record<string | symbol, unknown>)[prop];
+    return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(globalThis.__prisma) : value;
   },
 });

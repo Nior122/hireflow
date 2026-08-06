@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma, Prisma } from "@/lib/prisma";
 import { createOrGetUser } from "@/lib/clerk";
 import type { ActionResponse } from "@/lib/types";
+import { suggestApplicationStatus as aiSuggestStatus, type SuggestedStatus } from "@/lib/ai";
 
 interface ConversationData {
   id: string;
@@ -138,4 +139,14 @@ export async function getCareerScore(): Promise<ActionResponse<{ score: number; 
 
     return { success: true, data: { score, factors } };
   } catch { return { success: false, error: "Failed to compute career score" }; }
+}
+
+export async function suggestApplicationStatus(jobTitle: string, company: string, notes: string): Promise<ActionResponse<SuggestedStatus>> {
+  try {
+    await createOrGetUser(); // Ensure authenticated
+    const result = await aiSuggestStatus(jobTitle, company, notes);
+    return { success: true, data: result };
+  } catch {
+    return { success: false, error: "Failed to generate AI suggestion" };
+  }
 }

@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
         const decoder = new TextDecoder();
         let buffer = "";
         let contentBuffer = "";
-        let toolCallsBuffer: Array<{ id: string; name: string; arguments: string }> = [];
+        const toolCallsBuffer: Array<{ id: string; name: string; arguments: string }> = [];
         let hasToolCalls = false;
 
         try {
@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
             groqMessages.push(
               { role: "assistant", content: contentBuffer || "", tool_calls: toolCallsBuffer.map(t => ({ id: t.id, type: "function", function: { name: t.name, arguments: t.arguments } })) },
               ...toolCallsBuffer.filter(t => t.name).map(t => {
-                let resultStr = "";
+                const resultStr = "";
                 try {
                   let args = {};
                   try { args = JSON.parse(t.arguments); } catch {}

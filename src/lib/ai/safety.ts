@@ -2,7 +2,7 @@
  * AI Safety System — Prevents prompt injection, data leakage, and abuse.
  */
 
-import { z } from "zod";
+
 
 // Prompt injection patterns
 const INJECTION_PATTERNS = [

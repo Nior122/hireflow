@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
-import { Plus, FileText, Star, Copy, Trash2, ExternalLink, Loader2, Check } from "lucide-react";
+import { Plus, FileText, Star, Copy, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

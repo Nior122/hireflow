@@ -3,11 +3,11 @@
 import { useState, useTransition, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { BookmarkCheck, Trash2, Loader2, ExternalLink, Building2, MapPin, Plus } from "lucide-react";
+import { BookmarkCheck, Trash2, Loader2, ExternalLink, MapPin, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { deleteSavedJob, importSavedJobToKanban, getSavedJobs } from "@/actions/discover";
+import { deleteSavedJob, importSavedJobToKanban } from "@/actions/discover";
 import type { SavedJobData } from "@/lib/types";
 
 interface Props {

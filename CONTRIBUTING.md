@@ -1,82 +1,22 @@
 # Contributing to HireFlow
 
-Thank you for your interest in contributing to HireFlow! This guide will help you get started.
+We love your input! We want to make contributing to this project as easy and transparent as possible.
 
-## Getting Started
+## Development Process
 
-1. Fork the repository
-2. Clone your fork
-3. Create a feature branch
-4. Make your changes
-5. Submit a pull request
+1. Fork the repo and create your branch from `main`.
+2. If you've added code that should be tested, add tests.
+3. If you've changed APIs, update the documentation.
+4. Ensure the test suite passes (`npm run build`).
+5. Make sure your code lints (`npm run lint`).
+6. Issue a pull request.
 
-## Development Setup
+## Styleguide
+- Use TypeScript for all new files.
+- Follow the existing Tailwind CSS `oklch` color token conventions in `globals.css`.
+- Server Actions should be placed in `src/actions/`.
+- Reusable UI components go in `src/components/ui/` via `shadcn/ui`.
+- Use Server Components by default; add `'use client'` only when React hooks or interactivity are strictly required.
 
-```bash
-# Install dependencies
-npm install
-
-# Set up environment
-cp .env.example .env
-
-# Run development server
-npm run dev
-```
-
-## Code Standards
-
-### TypeScript
-- Strict TypeScript mode
-- No `any` types unless absolutely necessary
-- Proper interfaces and types
-- Zod for runtime validation
-
-### React
-- Functional components only
-- Hooks for state management
-- Server Components where possible
-- Client Components only for interactivity
-
-### Styling
-- Tailwind CSS classes
-- shadcn/ui components
-- Responsive design
-- Dark mode support
-
-### Testing
-- Write tests for new features
-- Maintain test coverage
-- Test edge cases
-
-## Pull Request Process
-
-1. Update documentation
-2. Add tests if applicable
-3. Ensure build passes
-4. Request review
-5. Address feedback
-
-## Commit Messages
-
-Use conventional commits:
-- `feat:` — New feature
-- `fix:` — Bug fix
-- `docs:` — Documentation
-- `test:` — Tests
-- `refactor:` — Code refactor
-- `chore:` — Maintenance
-
-## Reporting Issues
-
-- Use GitHub Issues
-- Include reproduction steps
-- Include environment info
-- Include screenshots if UI-related
-
-## Security Issues
-
-Report security vulnerabilities to security@hireflow.com
-
-## License
-
-By contributing, you agree that your contributions will be licensed under the MIT License.
+## Any contributions you make will be under the MIT Software License
+In short, when you submit code changes, your submissions are understood to be under the same MIT License that covers the project.

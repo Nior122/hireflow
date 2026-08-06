@@ -3,7 +3,7 @@
  * Analyzes resumes against job descriptions for match scoring.
  */
 
-import { getProvider, type ChatMessage } from "./providers";
+import { getProvider } from "./providers";
 import { z } from "zod";
 
 export const MatchResultSchema = z.object({

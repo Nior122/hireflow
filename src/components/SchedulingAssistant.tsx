@@ -6,9 +6,9 @@ import { format } from "date-fns";
 import { Calendar, Clock, Loader2, CheckCircle, Plug, Unplug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
+
 import { getAvailableSlots, createCalendarEvent, getCalendarStatus, disconnectCalendar } from "@/actions/calendar";
-import { generateCandidateReply } from "@/actions/candidates";
+
 
 interface TimeSlot {
   start: Date;
@@ -24,7 +24,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-export function SchedulingAssistant({ candidateId, candidateName, candidateEmail, positionApplied, open, onOpenChange }: Props) {
+export function SchedulingAssistant({ candidateName, candidateEmail, positionApplied, open, onOpenChange }: Props) {
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);

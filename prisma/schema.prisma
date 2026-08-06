@@ -46,6 +46,8 @@ model User {
   apiKeys           ApiKey[]
   usageRecords      UsageRecord[]
   interviewPractices InterviewPractice[]
+  notificationPrefs Json?
+  dashboardWidgets  Json?
 }
 
 model Subscription {
@@ -237,13 +239,16 @@ model JobPosting {
   benefits        String?
   status          JobPostingStatus @default(DRAFT)
   hiringManagerId String?
-  hiringManager   User?    @relation("HiringManagerOnPosting", fields: [hiringManagerId], references: [id])
+  hiringManager   User?    @relation("HiringManagerOnPosting", fields: [hiringManagerId], references: [id], onDelete: SetNull)
   createdBy       String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   candidates      Candidate[]
-  manager         User?    @relation("ManagedJobPostings", fields: [createdBy], references: [id])
+  manager         User?    @relation("ManagedJobPostings", fields: [createdBy], references: [id], onDelete: SetNull)
   interviewers    User[]   @relation("InterviewerOnJobs")
+
+  @@index([organizationId])
+  @@index([status])
 }
 
 model TeamComment {
@@ -390,6 +395,8 @@ model GmailToken {
   accessToken  String
   refreshToken String
   expiryDate   DateTime
+  lastSyncedAt DateTime?
+  historyId    String?
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -427,6 +434,7 @@ model JobApplication {
   activities          ActivityLog[]
 
   @@index([userId])
+  @@index([status])
 }
 
 model Reminder {
@@ -481,15 +489,17 @@ model Candidate {
   activities        CandidateActivity[]
   replies           AiReply[]
   jobPostingId      String?
-  jobPosting        JobPosting? @relation(fields: [jobPostingId], references: [id])
+  jobPosting        JobPosting? @relation(fields: [jobPostingId], references: [id], onDelete: SetNull)
   recruiterId       String?
-  recruiter         User?    @relation("AssignedToRecruiter", fields: [recruiterId], references: [id])
+  recruiter         User?    @relation("AssignedToRecruiter", fields: [recruiterId], references: [id], onDelete: SetNull)
   hiringManagerId   String?
-  hiringManager     User?    @relation("HiringManager", fields: [hiringManagerId], references: [id])
+  hiringManager     User?    @relation("HiringManager", fields: [hiringManagerId], references: [id], onDelete: SetNull)
   teamComments      TeamComment[]
   scorecards        CandidateScorecard[]
 
   @@index([employerId])
+  @@index([status])
+  @@index([jobPostingId])
 }
 
 enum CandidateStatus {
@@ -617,6 +627,7 @@ model Interview {
   timezone          String?
   status            InterviewStatus   @default(SCHEDULED)
   notes             String?
+  calendarEventId   String?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   practices         InterviewPractice[]

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Bookmark, BookmarkCheck, Plus, Building2, MapPin, DollarSign, ExternalLink, Sparkles, Loader2 } from "lucide-react";
+import { Bookmark, BookmarkCheck, Plus, Building2, MapPin, DollarSign, ExternalLink, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,7 +52,7 @@ export function JobCard({ job, isSaved, onClick, onSaved, onImported }: Props) {
     });
   }
 
-  function formatSalary(min: number | null | undefined, max: number | null | undefined, currency?: string | null) {
+  function formatSalary(min: number | null | undefined, max: number | null | undefined, _currency?: string | null) {
     if (!min && !max) return null;
     const fmt = (n: number) => n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${n}`;
     if (min && max) return `${fmt(min)} - ${fmt(max)}`;
@@ -72,12 +72,15 @@ export function JobCard({ job, isSaved, onClick, onSaved, onImported }: Props) {
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start gap-3">
           {job.companyLogo ? (
-            <img
-              src={job.companyLogo}
-              alt={`${job.company} logo`}
-              className="h-10 w-10 rounded-lg object-cover bg-muted flex-shrink-0"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-            />
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={job.companyLogo}
+                alt={`${job.company} logo`}
+                className="h-10 w-10 rounded-lg object-cover bg-muted flex-shrink-0"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+            </>
           ) : (
             <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
               <Building2 className="h-5 w-5 text-primary/60" />

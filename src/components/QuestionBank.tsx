@@ -5,9 +5,9 @@ import { toast } from "sonner";
 import { Sparkles, Loader2, ChevronDown, ChevronRight, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getTagColor } from "@/lib/utils";
 
 export function QuestionBank() {
   const [questions, setQuestions] = useState<any[]>([]);
@@ -17,7 +17,7 @@ export function QuestionBank() {
   const [role, setRole] = useState("Software Engineer");
   const [type, setType] = useState("Technical");
   const [difficulty, setDifficulty] = useState("Medium");
-  const [count, setCount] = useState("5");
+  const [count] = useState("5");
 
   function handleGenerate() {
     startTransition(async () => {
@@ -84,7 +84,14 @@ export function QuestionBank() {
                 <div className="flex gap-1.5 mt-1">
                   <Badge variant="secondary" className="text-[9px]">{q.category}</Badge>
                   <Badge variant="outline" className="text-[9px]">{q.difficulty}</Badge>
-                  {q.tags?.map((t: string) => <Badge key={t} variant="outline" className="text-[9px]">{t}</Badge>)}
+                  {q.tags?.map((t: string) => {
+                    const colors = getTagColor(t);
+                    return (
+                      <Badge key={t} variant="outline" className="text-[9px] border" style={{ backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}>
+                        {t}
+                      </Badge>
+                    );
+                  })}
                 </div>
               </div>
             </button>

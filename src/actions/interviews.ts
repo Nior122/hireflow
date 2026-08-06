@@ -5,6 +5,7 @@ import { prisma, Prisma } from "@/lib/prisma";
 import type { InterviewStatus } from "@prisma/client";
 import { createOrGetUser } from "@/lib/clerk";
 import type { ActionResponse } from "@/lib/types";
+import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, getCalendarStatus } from "./calendar";
 
 // ─── Interviews CRUD ────────────────────────────────────────────
 
@@ -44,6 +45,31 @@ export async function createInterview(data: {
         applicationId: data.applicationId ?? null,
       },
     });
+
+    // Sync with Calendar if connected
+    if (data.scheduledAt) {
+      const calStatus = await getCalendarStatus();
+      if (calStatus.success && calStatus.data?.connected) {
+        const start = new Date(data.scheduledAt);
+        const end = new Date(start.getTime() + (data.duration ?? 60) * 60000);
+        
+        const calRes = await createCalendarEvent(
+          `Interview: ${data.company} - ${data.position}`,
+          `Interview with ${data.company}\nType: ${data.interviewType ?? "TECHNICAL"}\nRound: ${data.interviewRound ?? 1}\nLocation: ${data.location ?? "TBD"}`,
+          start.toISOString(),
+          end.toISOString(),
+          data.interviewerEmail
+        );
+
+        if (calRes.success && calRes.data) {
+          await prisma.interview.update({
+            where: { id: interview.id },
+            data: { calendarEventId: calRes.data.id, meetingLink: calRes.data.hangoutLink ?? data.meetingLink }
+          });
+        }
+      }
+    }
+
     revalidatePath("/dashboard/interviews");
     return { success: true, data: interview };
   } catch { return { success: false, error: "Failed to create interview" }; }
@@ -64,6 +90,30 @@ export async function updateInterview(id: string, data: {
     if (data.location !== undefined) update.location = data.location;
     if (data.meetingLink !== undefined) update.meetingLink = data.meetingLink;
     if (data.interviewerName !== undefined) update.interviewerName = data.interviewerName;
+    
+    // Check if we need to update calendar
+    if (existing.calendarEventId && (data.scheduledAt || data.status === "CANCELLED" || data.status === "RESCHEDULED")) {
+      const calStatus = await getCalendarStatus();
+      if (calStatus.success && calStatus.data?.connected) {
+        if (data.status === "CANCELLED") {
+          await deleteCalendarEvent(existing.calendarEventId);
+          update.calendarEventId = null;
+        } else {
+          // It's an update/reschedule
+          const start = new Date(data.scheduledAt ?? existing.scheduledAt!);
+          const end = new Date(start.getTime() + (existing.duration ?? 60) * 60000);
+          await updateCalendarEvent(
+            existing.calendarEventId,
+            `Interview: ${existing.company} - ${existing.position}${data.status === "RESCHEDULED" ? " (Rescheduled)" : ""}`,
+            `Interview with ${existing.company}\nType: ${existing.interviewType}\nRound: ${existing.interviewRound}\nLocation: ${data.location ?? existing.location ?? "TBD"}`,
+            start.toISOString(),
+            end.toISOString(),
+            existing.interviewerEmail ?? undefined
+          );
+        }
+      }
+    }
+
     const interview = await prisma.interview.update({ where: { id }, data: update });
     revalidatePath("/dashboard/interviews");
     return { success: true, data: interview };
@@ -73,6 +123,16 @@ export async function updateInterview(id: string, data: {
 export async function deleteInterview(id: string): Promise<ActionResponse<void>> {
   try {
     const user = await createOrGetUser();
+    const existing = await prisma.interview.findFirst({ where: { id, userId: user.id } });
+    if (!existing) return { success: false, error: "Interview not found" };
+
+    if (existing.calendarEventId) {
+      const calStatus = await getCalendarStatus();
+      if (calStatus.success && calStatus.data?.connected) {
+        await deleteCalendarEvent(existing.calendarEventId);
+      }
+    }
+
     await prisma.interview.deleteMany({ where: { id, userId: user.id } });
     revalidatePath("/dashboard/interviews");
     return { success: true, data: undefined };

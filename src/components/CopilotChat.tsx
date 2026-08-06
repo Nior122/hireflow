@@ -249,7 +249,7 @@ export function CopilotChat({ conversationId, onNewMessage }: Props) {
             rows={1}
             className="resize-none min-h-[40px] max-h-[120px]"
           />
-          <Button onClick={handleSubmit} disabled={streaming || !input.trim()} size="icon" className="h-10 w-10 flex-shrink-0">
+          <Button onClick={handleSubmit} disabled={streaming || !input.trim()} size="icon" className="h-10 w-10 flex-shrink-0" aria-label="Send message">
             {streaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>

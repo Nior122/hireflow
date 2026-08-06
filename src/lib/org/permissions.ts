@@ -24,7 +24,7 @@ export const PERMISSIONS: Record<string, OrgRole[]> = {
   "audit:read": ["OWNER", "ADMIN"],
   "pipeline:manage": ["OWNER", "ADMIN", "RECRUITER"],
   "interviews:manage": ["OWNER", "ADMIN", "RECRUITER"],
-  "interviews:schedule": ["OWNER", "ADMIN", "RECRUITER", "HIRING_MANAGER"],
+  "interviews:schedule": ["OWNER", "ADMIN", "RECRUITER", "HIRING_MANAGER", "INTERVIEWER"],
   "analytics:read": ["OWNER", "ADMIN", "RECRUITER", "HIRING_MANAGER"],
 };
 

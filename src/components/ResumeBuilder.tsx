@@ -6,8 +6,7 @@ import { ArrowLeft, Sparkles, Save, Plus, Loader2, GripVertical, Trash2 } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { updateResume, updateSection, addSection, deleteSection, reorderSections, createVersion } from "@/actions/resume-studio";
 import { analyzeAts, resumeToText } from "@/lib/resume/ats";
 import { RESUME_TEMPLATES } from "@/lib/resume/templates";
@@ -34,7 +33,7 @@ const SECTION_TYPES = [
 type RightPanel = "ats" | "ai" | "templates";
 
 export function ResumeBuilder({ resume: initial, onBack }: Props) {
-  const [resume, setResume] = useState(initial);
+  const [resume] = useState(initial);
   const [name, setName] = useState(initial.name ?? "");
   const [title, setTitle] = useState(initial.title ?? "");
   const [summary, setSummary] = useState(initial.summary ?? "");

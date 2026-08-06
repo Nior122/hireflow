@@ -3,7 +3,7 @@ import { z } from "zod";
 // ─── Common Schemas ────────────────────────────────────────────
 
 export const emailSchema = z.string().email("Invalid email address");
-export const urlSchema = z.string().url("Invalid URL").or(z.literal(""));
+export const urlSchema = z.string().url("Invalid URL").or(z.literal("")).optional();
 export const phoneSchema = z.string().regex(/^\+?[\d\s\-()]{7,20}$/, "Invalid phone number").optional();
 
 export const paginationSchema = z.object({

@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { analyzeMatch } from "@/actions/resume";
 
+import type { AiMatchResult } from "@/lib/types";
+
 interface Props {
   company: string;
   role: string;
@@ -18,16 +20,10 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-interface MatchResult {
-  matchPercentage: number;
-  missingKeywords: string[];
-  tailoredBullets: string[];
-}
-
 export function ResumeMatcher({ company, role, jobDescription, open, onOpenChange }: Props) {
   const [isPending, startTransition] = useTransition();
   const [resumeText, setResumeText] = useState("");
-  const [result, setResult] = useState<MatchResult | null>(null);
+  const [result, setResult] = useState<AiMatchResult | null>(null);
 
   function handleAnalyze() {
     if (!resumeText.trim()) {
@@ -64,7 +60,7 @@ export function ResumeMatcher({ company, role, jobDescription, open, onOpenChang
         {!result ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Paste your resume text below and we'll analyze how well it matches the <strong>{role}</strong> position at <strong>{company}</strong>.
+              Paste your resume text below and we&apos;ll analyze how well it matches the <strong>{role}</strong> position at <strong>{company}</strong>.
             </p>
             <div className="space-y-2">
               <Label className="text-sm">Your Resume Text</Label>
@@ -97,15 +93,15 @@ export function ResumeMatcher({ company, role, jobDescription, open, onOpenChang
               <p className="text-sm text-muted-foreground mt-1">Match Score</p>
             </div>
 
-            {result.missingKeywords.length > 0 && (
+            {result.prioritySkills && result.prioritySkills.length > 0 && (
               <div>
                 <h4 className="text-sm font-semibold flex items-center gap-2 mb-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  Missing Keywords
+                  <AlertTriangle className="h-4 w-4 text-rose-500" />
+                  Critical Missing Skills
                 </h4>
                 <div className="flex flex-wrap gap-1.5">
-                  {result.missingKeywords.map((kw, i) => (
-                    <Badge key={i} variant="secondary" className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                  {result.prioritySkills.map((kw, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs bg-rose-500/10 text-rose-700 dark:text-rose-400">
                       {kw}
                     </Badge>
                   ))}
@@ -113,14 +109,30 @@ export function ResumeMatcher({ company, role, jobDescription, open, onOpenChang
               </div>
             )}
 
-            {result.tailoredBullets.length > 0 && (
+            {result.missingSkills && result.missingSkills.length > 0 && (
               <div>
-                <h4 className="text-sm font-semibold flex items-center gap-2 mb-2">
+                <h4 className="text-sm font-semibold flex items-center gap-2 mb-2 mt-4">
+                  <Sparkles className="h-4 w-4 text-amber-500" />
+                  Other Missing Skills
+                </h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {result.missingSkills.map((kw, i) => (
+                    <Badge key={i} variant="outline" className="text-xs text-muted-foreground">
+                      {kw}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {result.resumeChanges && result.resumeChanges.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold flex items-center gap-2 mb-2 mt-4">
                   <Lightbulb className="h-4 w-4 text-emerald-500" />
                   Suggested Improvements
                 </h4>
                 <ul className="space-y-2">
-                  {result.tailoredBullets.map((bullet, i) => (
+                  {result.resumeChanges.map((bullet, i) => (
                     <li key={i} className="text-sm text-muted-foreground p-3 rounded-lg bg-muted/30 border-l-2 border-emerald-500/50">
                       {bullet}
                     </li>

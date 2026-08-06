@@ -69,14 +69,18 @@ export async function extractApplicationData(emailBody: string): Promise<Applica
 
 const ResumeMatchSchema = z.object({
   matchPercentage: z.number().min(0).max(100),
-  missingKeywords: z.array(z.string()),
-  tailoredBullets: z.array(z.string()),
+  matchedSkills: z.array(z.string()),
+  missingSkills: z.array(z.string()),
+  prioritySkills: z.array(z.string()),
+  recommendedCourses: z.array(z.string()),
+  recommendedCertifications: z.array(z.string()),
+  resumeChanges: z.array(z.string()),
 });
 
 export type ResumeMatch = z.infer<typeof ResumeMatchSchema>;
 
 export async function matchResume(resumeText: string, jobDescription: string): Promise<ResumeMatch> {
-  const systemPrompt = `Compare the resume text below with the provided job description. Give a match percentage (0-100), list of missing keywords, and 3 tailored bullet points to improve the resume. Output only valid JSON.`;
+  const systemPrompt = `Compare the resume text below with the provided job description. Give a match percentage (0-100), list of matched skills, missing skills, priority skills to learn, recommended courses (short names), recommended certifications, and 3 specific tailored resume changes. Output only valid JSON.`;
 
   const result = await groqChat(systemPrompt, `RESUME:\n${resumeText}\n\nJOB DESCRIPTION:\n${jobDescription}`);
   const parsed = JSON.parse(result.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
@@ -88,3 +92,27 @@ export async function draftReply(template: string, candidateDetails: string, cus
 
   return groqChat(systemPrompt, `Template:\n${template}\n\nCandidate Details:\n${candidateDetails}`);
 }
+
+const SuggestStatusSchema = z.object({
+  status: z.enum(["UNAPPLIED", "WISHLIST", "APPLIED", "INTERVIEW", "OFFER", "REJECTED"]),
+  reasoning: z.string()
+});
+
+export type SuggestedStatus = z.infer<typeof SuggestStatusSchema>;
+
+export async function suggestApplicationStatus(jobTitle: string, company: string, notes: string): Promise<SuggestedStatus> {
+  const systemPrompt = `You are an AI assistant that determines the current status of a job application based on the user's notes and application context.
+Available statuses are: UNAPPLIED, WISHLIST, APPLIED, INTERVIEW, OFFER, REJECTED.
+Return the most appropriate status and a brief reasoning (max 1 sentence). Output ONLY valid JSON.`;
+
+  const userMessage = `Job Title: ${jobTitle}\nCompany: ${company}\nNotes/Activity: ${notes}`;
+  const result = await groqChat(systemPrompt, userMessage);
+  
+  try {
+    const parsed = JSON.parse(result.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
+    return SuggestStatusSchema.parse(parsed);
+  } catch {
+    return { status: "APPLIED", reasoning: "Fallback status due to parsing error." };
+  }
+}
+

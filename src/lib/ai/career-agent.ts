@@ -3,9 +3,8 @@
  * Analyzes user's job search data and provides actionable insights.
  */
 
-import { prisma } from "@/lib/prisma";
-import { getProvider, type ChatMessage } from "./providers";
-import { getUserCareerContext, trackAiInteraction } from "./memory";
+import { getProvider } from "./providers";
+import { getUserCareerContext } from "./memory";
 import { z } from "zod";
 
 export const CareerInsightSchema = z.object({

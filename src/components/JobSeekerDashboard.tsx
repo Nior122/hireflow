@@ -12,16 +12,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getApplications } from "@/actions/applications";
 import type { ApplicationCard, ApplicationStatus } from "@/lib/types";
 
+import type { DashboardWidgets } from "@/actions/widgets";
+
 const StatsSection = dynamic(() => import("./StatsSection").then(m => ({ default: m.StatsSection })), { loading: () => <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-8">{Array.from({length:4}).map((_,i)=><Skeleton key={i} className="h-24 rounded-xl"/>)}</div> });
 const EmailDigestPanel = dynamic(() => import("./EmailDigestPanel").then(m => ({ default: m.EmailDigestPanel })), { loading: () => <Skeleton className="h-32 rounded-xl" />, ssr: false });
+const UpcomingInterviewsWidget = dynamic(() => import("./UpcomingInterviewsWidget").then(m => ({ default: m.UpcomingInterviewsWidget })), { ssr: false });
+const SkillGapsWidget = dynamic(() => import("./SkillGapsWidget").then(m => ({ default: m.SkillGapsWidget })), { ssr: false });
 
-interface Props { userId: string; }
+interface Props { userId: string; widgets: DashboardWidgets; }
 
-export function JobSeekerDashboard({ userId }: Props) {
+export function JobSeekerDashboard({ userId, widgets }: Props) {
   const [applications, setApplications] = useState<ApplicationCard[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<{ search: string; statuses: ApplicationStatus[] }>({ search: "", statuses: [] });
-  const [showDigest, setShowDigest] = useState(false);
+  const [showDigest, setShowDigest] = useState(widgets.showEmailDigest);
 
   useEffect(() => {
     getApplications().then(r => {
@@ -106,7 +110,20 @@ export function JobSeekerDashboard({ userId }: Props) {
           <EmailDigestPanel />
         </div>
       )}
-      <StatsSection applications={apps} />
+      
+      {widgets.showUpcomingInterviews && (
+        <div className="mb-6">
+          <UpcomingInterviewsWidget />
+        </div>
+      )}
+      
+      {widgets.showSkillGaps && (
+        <div className="mb-6">
+          <SkillGapsWidget />
+        </div>
+      )}
+      
+      {widgets.showStats && <StatsSection applications={apps} />}
       <SearchFilterBar applications={apps} onFilterChange={handleFilterChange} />
       {isFiltering && filteredApps.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">

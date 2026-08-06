@@ -1,4 +1,4 @@
-import { PLANS, getPlan, type PlanDefinition } from "./plans";
+import { getPlan } from "./plans";
 
 export async function createStripeCheckout(planId: string, userId: string, email: string, interval: "month" | "year") {
   const plan = getPlan(planId);
@@ -21,7 +21,7 @@ export async function createStripeCheckout(planId: string, userId: string, email
   return { url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?checkout=${planId}&interval=${interval}` };
 }
 
-export async function createStripePortal(userId: string) {
+export async function createStripePortal(_userId: string) {
   // In production:
   // const customer = await getOrCreateStripeCustomer(userId);
   // const session = await stripe.billingPortal.sessions.create({ customer });
@@ -30,7 +30,7 @@ export async function createStripePortal(userId: string) {
   return { url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing` };
 }
 
-export async function handleStripeWebhook(event: string, data: Record<string, unknown>) {
+export async function handleStripeWebhook(event: string, _data: Record<string, unknown>) {
   // In production, verify webhook signature, then handle:
   // checkout.session.completed → create/update subscription
   // customer.subscription.updated → update subscription status
@@ -38,6 +38,7 @@ export async function handleStripeWebhook(event: string, data: Record<string, un
   // invoice.payment_failed → update status
   // invoice.paid → log payment
 
-  console.log(`Stripe webhook: ${event}`);
+  // Production: Use structured logger instead of console.log
+  // logger.info(`Stripe webhook processed: ${event}`);
   return { processed: true };
 }

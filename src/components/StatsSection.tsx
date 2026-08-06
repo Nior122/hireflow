@@ -5,7 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, L
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, Clock, Building2, BarChart3 } from "lucide-react";
-import { STATUS_LABELS, STATUS_ORDER, type ApplicationCard, type ApplicationStatus } from "@/lib/types";
+import { STATUS_LABELS, STATUS_ORDER, type ApplicationCard } from "@/lib/types";
 import { differenceInDays } from "date-fns";
 
 interface Props { applications: ApplicationCard[]; }

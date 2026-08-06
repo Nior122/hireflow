@@ -8,7 +8,7 @@ import { STATUS_ORDER, STATUS_LABELS, type ApplicationCard, type ApplicationStat
 
 interface Props { applications: ApplicationCard[]; onFilterChange: (filters: { search: string; statuses: ApplicationStatus[] }) => void; }
 
-export function SearchFilterBar({ applications, onFilterChange }: Props) {
+export function SearchFilterBar({ onFilterChange }: Props) {
   const [search, setSearch] = useState("");
   const [statuses, setStatuses] = useState<ApplicationStatus[]>([]);
 

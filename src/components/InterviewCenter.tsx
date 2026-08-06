@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { formatDistanceToNow, format } from "date-fns";
-import { Calendar, Plus, Play, BarChart3, FileText, CheckCircle, XCircle, Clock, Trash2, Loader2 } from "lucide-react";
+import { format } from "date-fns";
+import { Calendar, Plus, Play, BarChart3, CheckCircle, Clock, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -224,6 +224,7 @@ function CreateInterviewForm({ onSubmit }: { onSubmit: (data: any) => void }) {
   const [location, setLocation] = useState("");
   const [meetingLink, setMeetingLink] = useState("");
   const [interviewerName, setInterviewerName] = useState("");
+  const [notes, setNotes] = useState("");
 
   function handleSubmit() {
     if (!company.trim() || !position.trim()) return;
@@ -232,6 +233,7 @@ function CreateInterviewForm({ onSubmit }: { onSubmit: (data: any) => void }) {
       interviewRound: Number(round), scheduledAt: scheduledAt || undefined,
       duration: Number(duration), location: location || undefined,
       meetingLink: meetingLink || undefined, interviewerName: interviewerName || undefined,
+      notes: notes || undefined,
     });
   }
 
@@ -258,6 +260,7 @@ function CreateInterviewForm({ onSubmit }: { onSubmit: (data: any) => void }) {
         <div className="space-y-1"><Label className="text-xs">Location</Label><Input value={location} onChange={e => setLocation(e.target.value)} placeholder="Office / Remote" /></div>
         <div className="space-y-1"><Label className="text-xs">Meeting Link</Label><Input value={meetingLink} onChange={e => setMeetingLink(e.target.value)} placeholder="https://..." /></div>
       </div>
+      <div className="space-y-1"><Label className="text-xs">Notes</Label><Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any preparation notes..." /></div>
       <Button onClick={handleSubmit} disabled={!company.trim() || !position.trim()} className="w-full">Schedule Interview</Button>
     </div>
   );

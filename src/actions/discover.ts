@@ -188,10 +188,12 @@ export async function analyzeJobMatch(jobDescription: string, jobTitle: string, 
       success: true,
       data: {
         matchPercentage: match.matchPercentage,
-        missingSkills: match.missingKeywords,
-        strengths: [],
-        improvements: match.tailoredBullets,
-        interviewTips: [],
+        matchedSkills: match.matchedSkills,
+        missingSkills: match.missingSkills,
+        prioritySkills: match.prioritySkills,
+        recommendedCourses: match.recommendedCourses,
+        recommendedCertifications: match.recommendedCertifications,
+        resumeChanges: match.resumeChanges,
       },
     };
   } catch {

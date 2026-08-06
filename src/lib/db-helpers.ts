@@ -15,6 +15,7 @@ export async function getNextPosition(
   tableName: "jobApplication" | "candidate",
   userId: string,
   status: Status | CandidateStatus | string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   userIdField: string = "userId"
 ): Promise<number> {
   let lastRecord: { position: number } | null = null;
