@@ -18,13 +18,12 @@ function createPrismaClient(): PrismaClient {
   return new PrismaClient({ adapter });
 }
 
-// Lazy singleton — only constructed on first property access, never at import time.
-export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
-  get(_target, prop) {
-    if (!globalThis.__prisma) {
-      globalThis.__prisma = createPrismaClient();
-    }
-    const value = (globalThis.__prisma as unknown as Record<string | symbol, unknown>)[prop];
-    return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(globalThis.__prisma) : value;
-  },
-});
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+}
