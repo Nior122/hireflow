@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { google } from "googleapis";
+import { generateOAuthState } from "@/lib/oauth-state";
 
 export async function GET() {
   const { userId } = await auth();
@@ -29,7 +30,7 @@ export async function GET() {
       "https://www.googleapis.com/auth/gmail.modify",
       "https://www.googleapis.com/auth/gmail.send",
     ],
-    state: userId,
+    state: generateOAuthState(userId),
   });
 
   return NextResponse.redirect(url);

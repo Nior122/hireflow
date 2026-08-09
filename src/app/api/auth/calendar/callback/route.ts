@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { prisma } from "@/lib/prisma";
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://hireflows.vercel.app";
+import { verifyOAuthState } from "@/lib/oauth-state";
 
 export async function GET(req: NextRequest) {
+  const origin = new URL(req.url).origin;
+  
   try {
     const { searchParams } = new URL(req.url);
     const code = searchParams.get("code");
@@ -13,13 +14,20 @@ export async function GET(req: NextRequest) {
 
     if (error) {
       return NextResponse.redirect(
-        new URL(`/dashboard/settings?calendar=error&reason=${encodeURIComponent(error)}`, APP_URL)
+        new URL(`/dashboard/settings?calendar=error&reason=${encodeURIComponent(error)}`, origin)
       );
     }
 
     if (!code || !state) {
       return NextResponse.redirect(
-        new URL("/dashboard/settings?calendar=error&reason=missing_params", APP_URL)
+        new URL("/dashboard/settings?calendar=error&reason=missing_params", origin)
+      );
+    }
+
+    const clerkId = verifyOAuthState(state);
+    if (!clerkId) {
+      return NextResponse.redirect(
+        new URL("/dashboard/settings?calendar=error&reason=invalid_state", origin)
       );
     }
 
@@ -27,11 +35,11 @@ export async function GET(req: NextRequest) {
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     const redirectUri =
       process.env.GOOGLE_CALENDAR_REDIRECT_URI ??
-      `${APP_URL}/api/auth/calendar/callback`;
+      `${origin}/api/auth/calendar/callback`;
 
     if (!clientId || !clientSecret) {
       return NextResponse.redirect(
-        new URL("/dashboard/settings?calendar=error&reason=not_configured", APP_URL)
+        new URL("/dashboard/settings?calendar=error&reason=not_configured", origin)
       );
     }
 
@@ -41,19 +49,19 @@ export async function GET(req: NextRequest) {
 
     if (!tokens.access_token) {
       return NextResponse.redirect(
-        new URL("/dashboard/settings?calendar=error&reason=no_access_token", APP_URL)
+        new URL("/dashboard/settings?calendar=error&reason=no_access_token", origin)
       );
     }
 
     // Look up the internal DB user from the Clerk ID stored in `state`
     const dbUser = await prisma.user.findUnique({
-      where: { clerkId: state },
+      where: { clerkId: clerkId },
       select: { id: true },
     });
 
     if (!dbUser) {
       return NextResponse.redirect(
-        new URL("/dashboard/settings?calendar=error&reason=user_not_found", APP_URL)
+        new URL("/dashboard/settings?calendar=error&reason=user_not_found", origin)
       );
     }
 
@@ -73,11 +81,11 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    return NextResponse.redirect(new URL("/dashboard/settings?calendar=connected", APP_URL));
+    return NextResponse.redirect(new URL("/dashboard/settings?calendar=connected", origin));
   } catch (err) {
     console.error("Calendar callback error:", err);
     return NextResponse.redirect(
-      new URL("/dashboard/settings?calendar=error&reason=callback_failed", APP_URL)
+      new URL("/dashboard/settings?calendar=error&reason=callback_failed", origin)
     );
   }
 }
