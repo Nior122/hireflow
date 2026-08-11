@@ -1,210 +1,256 @@
 'use client';
 
-import { useState, useTransition, useEffect, useMemo } from "react";
+import { useState, useEffect, useTransition, useCallback } from "react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Check, Loader2, Inbox, Plug, Unplug, RefreshCw, Archive, Undo2, Search, Filter, ArrowDownWideNarrow, Trash2 } from "lucide-react";
+import {
+  Mail, Loader2, Inbox, Plug, Unplug, RefreshCw,
+  Search, Filter, CheckCircle2, AlertCircle, Clock,
+  Briefcase, UserCheck, XCircle, CalendarCheck, Gift,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { scanInbox, classifyEmails, importEmailAsApplication, getGmailStatus, disconnectGmail, archiveEmail, undoImportEmail } from "@/actions/gmail";
+import { getGmailStatus, disconnectGmail } from "@/actions/gmail";
+import { syncGmailInbox, getInboxEmails, getGmailSyncStatus } from "@/actions/gmail-sync";
+import { importEmailAsApplication } from "@/actions/gmail";
+import { formatDistanceToNow } from "date-fns";
 
-interface ClassifiedEmail {
-  message: { id: string; subject: string; from: string; body: string; date: string };
-  classification: {
-    isJobRelated: boolean;
-    type: string;
-    company?: string;
-    role?: string;
-    summary: string;
-    suggestedStatus: string;
-  };
+interface EmailRecord {
+  id: string;
+  gmailMessageId: string;
+  sender: string | null;
+  senderEmail: string | null;
+  subject: string | null;
+  snippet: string | null;
+  receivedAt: Date | null;
+  isRead: boolean;
+  category: string | null;
+  confidence: number | null;
+  jobRelated: boolean;
+  applicationRelated: boolean;
+  interviewRelated: boolean;
+  rejectionRelated: boolean;
+  offerRelated: boolean;
+  createdAt: Date;
+}
+
+const CATEGORY_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+  JOB_OPPORTUNITY: { label: "Job Opportunity", icon: <Briefcase className="h-3 w-3" />, color: "bg-blue-500/10 text-blue-600 border-blue-200" },
+  RECRUITER: { label: "Recruiter", icon: <UserCheck className="h-3 w-3" />, color: "bg-purple-500/10 text-purple-600 border-purple-200" },
+  INTERVIEW: { label: "Interview", icon: <CalendarCheck className="h-3 w-3" />, color: "bg-emerald-500/10 text-emerald-600 border-emerald-200" },
+  INTERVIEW_REMINDER: { label: "Interview Reminder", icon: <CalendarCheck className="h-3 w-3" />, color: "bg-emerald-500/10 text-emerald-600 border-emerald-200" },
+  REJECTION: { label: "Rejection", icon: <XCircle className="h-3 w-3" />, color: "bg-red-500/10 text-red-600 border-red-200" },
+  OFFER: { label: "Offer", icon: <Gift className="h-3 w-3" />, color: "bg-amber-500/10 text-amber-600 border-amber-200" },
+  APPLICATION_CONFIRMATION: { label: "Application Confirmed", icon: <CheckCircle2 className="h-3 w-3" />, color: "bg-teal-500/10 text-teal-600 border-teal-200" },
+  FOLLOW_UP: { label: "Follow Up", icon: <Mail className="h-3 w-3" />, color: "bg-sky-500/10 text-sky-600 border-sky-200" },
+  OTHER: { label: "Other", icon: <Mail className="h-3 w-3" />, color: "bg-muted text-muted-foreground border-border" },
+};
+
+function getCategoryMeta(category: string | null) {
+  if (!category) return CATEGORY_META.OTHER;
+  return CATEGORY_META[category] ?? CATEGORY_META.OTHER;
 }
 
 export function EmailDigestPanel() {
-  const [emails, setEmails] = useState<ClassifiedEmail[]>([]);
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [emails, setEmails] = useState<EmailRecord[]>([]);
+  const [totalEmails, setTotalEmails] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [scanError, setScanError] = useState<string | null>(null);
+  const [initializing, setInitializing] = useState(true);
+  const [syncing, startSync] = useTransition();
   const [importing, startImport] = useTransition();
   const [importedIds, setImportedIds] = useState<Set<string>>(new Set());
-  const [scannedOnce, setScannedOnce] = useState(false);
+
   const [gmailConnected, setGmailConnected] = useState(false);
-  const [checkingStatus, setCheckingStatus] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<{
+    lastSyncedAt: Date | null;
+    emailCount: number;
+    jobsDiscovered: number;
+  } | null>(null);
 
-  // Search, Filter, Sort
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<"date" | "company">("date");
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
-  useEffect(() => {
-    getGmailStatus().then(r => {
-      if (r.success && r.data) setGmailConnected(r.data.connected);
-      setCheckingStatus(false);
-    });
-  }, []);
-
+  // Handle OAuth redirect query params
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const gmailParam = params.get("gmail");
     if (gmailParam === "connected") {
-      toast.success("Gmail connected successfully!");
+      toast.success("Gmail connected! Syncing your inbox...");
       setGmailConnected(true);
-      window.history.replaceState({}, "", "/dashboard");
+      window.history.replaceState({}, "", window.location.pathname);
+      // Auto-sync after connect
+      handleSync();
     } else if (gmailParam === "error") {
       const reason = params.get("reason");
-      toast.error(reason ? `Gmail connection failed: ${reason}` : "Failed to connect Gmail");
-      window.history.replaceState({}, "", "/dashboard");
+      toast.error(reason ? `Gmail connection failed: ${reason.replace(/_/g, " ")}` : "Failed to connect Gmail");
+      window.history.replaceState({}, "", window.location.pathname);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function handleConnectGmail() {
-    window.location.href = "/api/auth/gmail/connect";
+  const loadStatus = useCallback(async () => {
+    const [statusRes, gmailRes] = await Promise.all([
+      getGmailSyncStatus(),
+      getGmailStatus(),
+    ]);
+    if (gmailRes.success && gmailRes.data) setGmailConnected(gmailRes.data.connected);
+    if (statusRes.success && statusRes.data) setSyncStatus(statusRes.data);
+    setInitializing(false);
+  }, []);
+
+  const loadEmails = useCallback(async (currentPage = 1, filter: string | null = null) => {
+    setLoading(true);
+    const res = await getInboxEmails({
+      category: filter ?? undefined,
+      page: currentPage,
+      pageSize: 20,
+      jobRelatedOnly: !filter,
+    });
+    if (res.success && res.data) {
+      if (currentPage === 1) {
+        setEmails(res.data.emails as EmailRecord[]);
+      } else {
+        setEmails(prev => [...prev, ...(res.data!.emails as EmailRecord[])]);
+      }
+      setTotalEmails(res.data.total);
+      setHasMore(res.data.hasMore);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadStatus();
+  }, [loadStatus]);
+
+  useEffect(() => {
+    if (!initializing && gmailConnected) {
+      loadEmails(1, categoryFilter);
+      setPage(1);
+    }
+  }, [initializing, gmailConnected, categoryFilter, loadEmails]);
+
+  function handleSync() {
+    startSync(async () => {
+      const res = await syncGmailInbox();
+      if (res.success && res.data) {
+        toast.success(
+          `Synced ${res.data.emailsProcessed} emails${res.data.jobsDiscovered > 0 ? `, found ${res.data.jobsDiscovered} new job${res.data.jobsDiscovered !== 1 ? "s" : ""}` : ""}`
+        );
+        await loadStatus();
+        await loadEmails(1, categoryFilter);
+        setPage(1);
+      } else if (!res.success) {
+        toast.error(res.error ?? "Failed to sync inbox");
+      }
+    });
+  }
+
+  function handleLoadMore() {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    loadEmails(nextPage, categoryFilter);
   }
 
   async function handleDisconnect() {
-    const result = await disconnectGmail();
-    if (result.success) {
+    const res = await disconnectGmail();
+    if (res.success) {
       toast.success("Gmail disconnected");
       setGmailConnected(false);
       setEmails([]);
-      setScannedOnce(false);
+      setSyncStatus(null);
     } else {
-      toast.error(result.error ?? "Failed to disconnect");
+      toast.error(res.error ?? "Failed to disconnect");
     }
   }
 
-  async function handleScan() {
-    setLoading(true);
-    setScanError(null);
-    try {
-      const result = await scanInbox();
-      if (!result.success || !result.data) {
-        setScanError(result.error ?? "Failed to scan inbox");
-        toast.error(result.error ?? "Failed to scan inbox");
-        setLoading(false);
-        return;
-      }
-      const classified = await classifyEmails(result.data);
-      if (classified.success && classified.data) {
-        const jobEmails = classified.data.filter(e => e.classification.isJobRelated);
-        setEmails(jobEmails);
-        setScannedOnce(true);
-        toast.success(`Found ${jobEmails.length} job-related emails`);
-      }
-    } catch {
-      setScanError("Failed to scan inbox");
-      toast.error("Failed to scan inbox");
-    }
-    setLoading(false);
-  }
-
-  function handleImport(email: ClassifiedEmail) {
+  function handleImport(email: EmailRecord) {
     startImport(async () => {
-      const result = await importEmailAsApplication(email.message, email.classification);
-      if (result.success) {
-        toast.success("Imported successfully");
-        setImportedIds(prev => new Set([...prev, email.message.id]));
+      const mockMsg = {
+        id: email.gmailMessageId,
+        subject: email.subject ?? "",
+        from: email.sender ?? email.senderEmail ?? "",
+        body: email.snippet ?? "",
+        date: email.receivedAt?.toISOString() ?? "",
+      };
+      const mockClass = {
+        isJobRelated: email.jobRelated,
+        type: email.category ?? "other",
+        summary: email.snippet ?? "",
+        suggestedStatus: email.applicationRelated ? "APPLIED" : email.interviewRelated ? "INTERVIEW" : email.offerRelated ? "OFFER" : email.rejectionRelated ? "REJECTED" : "APPLIED",
+        company: email.sender ?? undefined,
+        role: email.subject?.replace(/^re:\s*/i, "") ?? undefined,
+      };
+      const res = await importEmailAsApplication(mockMsg, mockClass);
+      if (res.success) {
+        toast.success("Added to Applications");
+        setImportedIds(prev => new Set([...prev, email.id]));
       } else {
-        toast.error(result.error ?? "Failed to import");
+        toast.error(res.error ?? "Failed to import");
       }
     });
   }
 
-  function handleUndoImport(emailId: string) {
-    startImport(async () => {
-      const result = await undoImportEmail(emailId);
-      if (result.success) {
-        toast.success("Import undone");
-        setImportedIds(prev => {
-          const next = new Set(prev);
-          next.delete(emailId);
-          return next;
-        });
-      } else {
-        toast.error(result.error ?? "Failed to undo import");
-      }
-    });
-  }
-
-  function handleArchive(emailId: string) {
-    startImport(async () => {
-      const result = await archiveEmail(emailId);
-      if (result.success) {
-        toast.success("Archived in Gmail");
-        setDismissedIds(prev => new Set([...prev, emailId]));
-      } else {
-        toast.error(result.error ?? "Failed to archive");
-      }
-    });
-  }
-
-  function handleImportAll() {
-    const unimported = visibleEmails.filter(e => !importedIds.has(e.message.id));
-    if (unimported.length === 0) {
-      toast.info("No new emails to import in the current view.");
-      return;
-    }
-    startImport(async () => {
-      let successCount = 0;
-      for (const email of unimported) {
-        const result = await importEmailAsApplication(email.message, email.classification);
-        if (result.success) {
-          successCount++;
-          setImportedIds(prev => new Set([...prev, email.message.id]));
-        }
-      }
-      toast.success(`Imported ${successCount} out of ${unimported.length} emails`);
-    });
-  }
-
-  let filtered = emails.filter(e => !dismissedIds.has(e.message.id));
-  if (searchQuery) {
+  // Client-side search filter
+  const visible = emails.filter(e => {
+    if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
-    filtered = filtered.filter(e => 
-      e.message.subject.toLowerCase().includes(q) || 
-      e.classification.company?.toLowerCase().includes(q) ||
-      e.message.from.toLowerCase().includes(q)
+    return (
+      e.subject?.toLowerCase().includes(q) ||
+      e.sender?.toLowerCase().includes(q) ||
+      e.senderEmail?.toLowerCase().includes(q) ||
+      e.snippet?.toLowerCase().includes(q)
     );
-  }
-  if (statusFilter) {
-    filtered = filtered.filter(e => e.classification.suggestedStatus === statusFilter);
-  }
-  const visibleEmails = [...filtered].sort((a, b) => {
-    if (sortBy === "company") {
-      return (a.classification.company || "").localeCompare(b.classification.company || "");
-    }
-    return new Date(b.message.date).getTime() - new Date(a.message.date).getTime();
   });
 
-  if (checkingStatus) {
+  if (initializing) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold flex items-center gap-2"><Inbox className="h-5 w-5" /> Email Digest</h3>
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Inbox className="h-5 w-5" /> Email Intelligence
+          </h3>
+          {syncStatus && (
+            <Badge variant="outline" className="text-[10px] gap-1 py-0.5">
+              <Clock className="h-2.5 w-2.5" />
+              {syncStatus.lastSyncedAt
+                ? `Synced ${formatDistanceToNow(new Date(syncStatus.lastSyncedAt), { addSuffix: true })}`
+                : "Never synced"}
+            </Badge>
+          )}
+        </div>
+
         <div className="flex items-center gap-2">
           {!gmailConnected ? (
-            <Button onClick={handleConnectGmail} size="sm" className="gap-2">
+            <Button onClick={() => { window.location.href = "/api/auth/gmail/connect"; }} size="sm" className="gap-2">
               <Plug className="h-4 w-4" /> Connect Gmail
             </Button>
           ) : (
             <>
-              <Badge variant="outline" className="text-[11px] gap-1 py-1">
-                <Mail className="h-3 w-3 text-emerald-500" />
-                Gmail connected
+              <Badge variant="outline" className="text-[11px] gap-1 py-1 text-emerald-600 border-emerald-200">
+                <Mail className="h-3 w-3" /> Gmail connected
               </Badge>
-              <Button onClick={handleScan} disabled={loading} size="sm" className="gap-2">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                {loading ? "Scanning..." : "Scan Inbox"}
+              {syncStatus && (
+                <span className="text-xs text-muted-foreground">
+                  {syncStatus.emailCount} emails · {syncStatus.jobsDiscovered} jobs found
+                </span>
+              )}
+              <Button onClick={handleSync} disabled={syncing} size="sm" className="gap-2">
+                {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                {syncing ? "Syncing..." : "Sync Inbox"}
               </Button>
               <Button variant="ghost" size="icon-xs" onClick={handleDisconnect} title="Disconnect Gmail">
                 <Unplug className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
@@ -214,131 +260,168 @@ export function EmailDigestPanel() {
         </div>
       </div>
 
-      {!gmailConnected && emails.length === 0 && !loading && (
-        <div className="text-center py-12 text-muted-foreground">
-          <Inbox className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p className="text-sm">Connect Gmail to auto-import job applications from your inbox</p>
-          <Button onClick={handleConnectGmail} variant="outline" size="sm" className="mt-4 gap-2">
+      {/* Not connected empty state */}
+      {!gmailConnected && (
+        <div className="text-center py-16 border-2 border-dashed rounded-xl space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+            <Mail className="h-8 w-8 text-primary" />
+          </div>
+          <div>
+            <p className="font-semibold">Connect Gmail to let HireFlow understand your job search</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              HireFlow will scan your inbox and automatically discover job opportunities, interviews, offers, and rejections.
+            </p>
+          </div>
+          <Button onClick={() => { window.location.href = "/api/auth/gmail/connect"; }} className="gap-2">
             <Plug className="h-4 w-4" /> Connect Gmail
           </Button>
         </div>
       )}
 
-      {scanError && !loading && (
-        <div className="text-center py-8 text-muted-foreground">
-          <p className="text-sm text-destructive mb-2">{scanError}</p>
-          <p className="text-xs">Make sure Gmail is connected and try again</p>
+      {/* Connected but no emails yet */}
+      {gmailConnected && !loading && emails.length === 0 && (
+        <div className="text-center py-12 border-2 border-dashed rounded-xl space-y-3">
+          <Inbox className="h-10 w-10 mx-auto text-muted-foreground/40" />
+          <div>
+            <p className="font-medium text-sm">No relevant emails found yet</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {syncStatus?.lastSyncedAt
+                ? "No job-related emails were found in your recent inbox. Try syncing again or check back later."
+                : "Click \"Sync Inbox\" to scan your Gmail for job opportunities, interviews, and offers."}
+            </p>
+          </div>
+          {!syncStatus?.lastSyncedAt && (
+            <Button onClick={handleSync} disabled={syncing} size="sm" className="gap-2">
+              {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Sync Now
+            </Button>
+          )}
         </div>
       )}
 
-      {scannedOnce && emails.length === 0 && !loading && !scanError && (
-        <div className="text-center py-8 text-muted-foreground">
-          <Inbox className="h-10 w-10 mx-auto mb-3 opacity-40" />
-          <p className="text-sm">No job-related emails found in your inbox</p>
-        </div>
-      )}
-
-      {emails.length > 0 && (
-        <div className="flex items-center justify-between gap-2 bg-muted/50 p-2 rounded-lg">
-          <div className="flex items-center gap-2 flex-1">
-            <Search className="h-4 w-4 text-muted-foreground ml-2 shrink-0" />
-            <Input 
-              placeholder="Search emails..." 
+      {/* Filters + Search */}
+      {gmailConnected && emails.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search emails..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="h-8 w-full max-w-[200px] bg-background border-none text-xs"
+              className="h-8 pl-8 text-xs"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 text-xs px-3 gap-2">
-                <Filter className="h-3.5 w-3.5" />
-                {statusFilter || "All Statuses"}
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="text-xs">
-                <DropdownMenuItem onClick={() => setStatusFilter(null)}>All Statuses</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("INTERVIEW")}>Interview</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("REJECTED")}>Rejected</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("OFFER")}>Offer</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 text-xs px-3 gap-2">
-                <ArrowDownWideNarrow className="h-3.5 w-3.5" />
-                Sort: {sortBy === "date" ? "Newest" : "Company"}
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="text-xs">
-                <DropdownMenuItem onClick={() => setSortBy("date")}>Date (Newest)</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSortBy("company")}>Company (A-Z)</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <Button size="sm" onClick={handleImportAll} disabled={importing} className="h-8 text-xs">
-              Import All Visible
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 h-8 text-xs font-medium hover:bg-accent">
+              <Filter className="h-3.5 w-3.5" />
+              {categoryFilter ? (getCategoryMeta(categoryFilter).label) : "All Categories"}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="text-xs">
+              <DropdownMenuItem onClick={() => setCategoryFilter(null)}>All Categories</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCategoryFilter("JOB_OPPORTUNITY")}>Job Opportunity</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCategoryFilter("RECRUITER")}>Recruiter</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCategoryFilter("INTERVIEW")}>Interview</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCategoryFilter("REJECTION")}>Rejection</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCategoryFilter("OFFER")}>Offer</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCategoryFilter("APPLICATION_CONFIRMATION")}>Application Confirmed</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       )}
 
-      <div className="space-y-3">
+      {/* Email List */}
+      <div className="space-y-2">
         <AnimatePresence>
-          {visibleEmails.map((email, i) => (
-            <motion.div 
-              key={email.message.id} 
-              initial={{ opacity: 0, y: 10 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              exit={{ opacity: 0, height: 0, marginBottom: 0, scale: 0.95 }}
-              transition={{ delay: i * 0.02, duration: 0.2 }}
-            >
-              <Card className={importedIds.has(email.message.id) ? "opacity-60 bg-muted/30" : ""}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm truncate">{email.message.subject}</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">{email.message.from}</p>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{email.classification.summary}</p>
-                      <div className="flex gap-2 mt-2">
-                        <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary">{email.classification.type.replace('_', ' ')}</Badge>
-                        <Badge variant="outline" className="text-[10px]">{email.classification.suggestedStatus}</Badge>
-                        {email.classification.company && <Badge variant="secondary" className="text-[10px]">{email.classification.company}</Badge>}
+          {visible.map((email, i) => {
+            const meta = getCategoryMeta(email.category);
+            const isImported = importedIds.has(email.id);
+
+            return (
+              <motion.div
+                key={email.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, height: 0, scale: 0.97 }}
+                transition={{ delay: i * 0.015, duration: 0.2 }}
+              >
+                <Card className={`transition-opacity ${isImported ? "opacity-50" : ""} ${!email.isRead ? "border-primary/30" : ""}`}>
+                  <CardContent className="p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border font-medium ${meta.color}`}>
+                            {meta.icon} {meta.label}
+                          </span>
+                          {!email.isRead && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" title="Unread" />
+                          )}
+                        </div>
+                        <h4 className="font-medium text-sm mt-1 truncate">{email.subject || "(No Subject)"}</h4>
+                        <p className="text-xs text-muted-foreground">
+                          {email.sender || email.senderEmail || "Unknown sender"}
+                          {email.receivedAt && (
+                            <span className="ml-2 opacity-60">
+                              · {formatDistanceToNow(new Date(email.receivedAt), { addSuffix: true })}
+                            </span>
+                          )}
+                        </p>
+                        {email.snippet && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2 opacity-80">{email.snippet}</p>
+                        )}
+                      </div>
+
+                      <div className="shrink-0 flex items-center gap-1">
+                        {email.applicationRelated || email.jobRelated || email.interviewRelated || email.offerRelated ? (
+                          isImported ? (
+                            <Badge className="text-[10px] bg-emerald-500/10 text-emerald-600">
+                              <CheckCircle2 className="h-3 w-3 mr-0.5" /> Added
+                            </Badge>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleImport(email)}
+                              disabled={importing}
+                              className="h-7 text-xs gap-1"
+                            >
+                              {importing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Briefcase className="h-3 w-3" />}
+                              Add to Apps
+                            </Button>
+                          )
+                        ) : null}
                       </div>
                     </div>
-                    <div className="flex flex-col gap-1 items-end shrink-0">
-                      {!importedIds.has(email.message.id) ? (
-                        <>
-                          <Button size="sm" variant="default" onClick={() => handleImport(email)} disabled={importing} className="w-full text-xs h-7">
-                            {importing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
-                            Import
-                          </Button>
-                          <div className="flex gap-1 w-full mt-1">
-                            <Button size="icon-xs" variant="outline" className="flex-1 h-6" onClick={() => handleArchive(email.message.id)} title="Archive in Gmail">
-                              <Archive className="h-3 w-3 text-muted-foreground hover:text-primary" />
-                            </Button>
-                            <Button size="icon-xs" variant="outline" className="flex-1 h-6" onClick={() => setDismissedIds(prev => new Set([...prev, email.message.id]))} title="Dismiss (hide)">
-                              <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                            </Button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <Badge className="text-[10px] bg-emerald-500/10 text-emerald-600 mb-1">Imported</Badge>
-                          <Button size="icon-xs" variant="ghost" className="h-6 w-full text-[10px] gap-1" onClick={() => handleUndoImport(email.message.id)} title="Undo Import">
-                            <Undo2 className="h-3 w-3" /> Undo
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
-        
-        {emails.length > 0 && visibleEmails.length === 0 && (
-          <div className="text-center py-6 text-muted-foreground text-sm">
-            No emails match your current filters.
+
+        {/* Load More */}
+        {hasMore && !searchQuery && (
+          <div className="text-center pt-2">
+            <Button variant="outline" size="sm" onClick={handleLoadMore} disabled={loading} className="gap-2">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Load More ({totalEmails - emails.length} remaining)
+            </Button>
+          </div>
+        )}
+
+        {/* Search empty state */}
+        {visible.length === 0 && emails.length > 0 && searchQuery && (
+          <div className="text-center py-6 text-muted-foreground">
+            <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-40" />
+            <p className="text-sm">No emails match your search.</p>
+          </div>
+        )}
+
+        {/* Syncing indicator */}
+        {syncing && (
+          <div className="text-center py-4 text-muted-foreground text-sm flex items-center justify-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Scanning your Gmail inbox for job-related emails...
           </div>
         )}
       </div>

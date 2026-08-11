@@ -5,6 +5,8 @@ import { prisma, Prisma } from "@/lib/prisma";
 import { createOrGetUser } from "@/lib/clerk";
 import type { ActionResponse } from "@/lib/types";
 import { suggestApplicationStatus as aiSuggestStatus, type SuggestedStatus } from "@/lib/ai";
+import { buildUserAIContext, getContextSummary } from "@/lib/ai/context";
+import { GroqProvider } from "@/lib/ai/providers";
 
 interface ConversationData {
   id: string;
@@ -150,3 +152,76 @@ export async function suggestApplicationStatus(jobTitle: string, company: string
     return { success: false, error: "Failed to generate AI suggestion" };
   }
 }
+
+// ─── User-Context AI Copilot ─────────────────────────────────────────────────
+
+export async function sendCopilotMessage(
+  conversationId: string,
+  userMessage: string
+): Promise<ActionResponse<{ reply: string; contextSummary: string }>> {
+  try {
+    const user = await createOrGetUser();
+
+    // Verify conversation ownership
+    const conv = await prisma.conversation.findFirst({
+      where: { id: conversationId, userId: user.id },
+    });
+    if (!conv) return { success: false, error: "Conversation not found." };
+
+    // Save the user message
+    await prisma.conversationMessage.create({
+      data: {
+        conversationId,
+        role: "user",
+        content: userMessage,
+        metadata: Prisma.JsonNull,
+      },
+    });
+
+    // Fetch conversation history (last 10 messages for context)
+    const history = await prisma.conversationMessage.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: "asc" },
+      take: 10,
+    });
+
+    // Build the user-data-aware system prompt
+    const systemPrompt = await buildUserAIContext(user.id);
+
+    // Call Groq with the full context
+    const provider = new GroqProvider();
+    const messages = [
+      { role: "system" as const, content: systemPrompt },
+      ...history.map(m => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+    ];
+
+    const reply = await provider.chat(messages, { temperature: 0.4, maxTokens: 1024 });
+
+    // Save the AI reply
+    await prisma.conversationMessage.create({
+      data: {
+        conversationId,
+        role: "assistant",
+        content: reply,
+        metadata: Prisma.JsonNull,
+      },
+    });
+
+    // Update conversation timestamp
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { updatedAt: new Date() },
+    });
+
+    const contextSummary = await getContextSummary(user.id);
+
+    return { success: true, data: { reply, contextSummary } };
+  } catch (err) {
+    console.error("[copilot] sendCopilotMessage error:", err instanceof Error ? err.message : "unknown");
+    return { success: false, error: "Unable to get a response right now. Please try again." };
+  }
+}
+
