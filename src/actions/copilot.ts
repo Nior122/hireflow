@@ -5,7 +5,8 @@ import { prisma, Prisma } from "@/lib/prisma";
 import { createOrGetUser } from "@/lib/clerk";
 import type { ActionResponse } from "@/lib/types";
 import { suggestApplicationStatus as aiSuggestStatus, type SuggestedStatus } from "@/lib/ai";
-import { buildUserAIContext, getContextSummary } from "@/lib/ai/context";
+import { buildUserAIContext, getContextSummary, buildJobAwareContext } from "@/lib/ai/context";
+import { getCareerMemoryContext } from "@/actions/memory";
 import { GroqProvider } from "@/lib/ai/providers";
 
 interface ConversationData {
@@ -157,7 +158,8 @@ export async function suggestApplicationStatus(jobTitle: string, company: string
 
 export async function sendCopilotMessage(
   conversationId: string,
-  userMessage: string
+  userMessage: string,
+  jobApplicationId?: string
 ): Promise<ActionResponse<{ reply: string; contextSummary: string }>> {
   try {
     const user = await createOrGetUser();
@@ -185,8 +187,13 @@ export async function sendCopilotMessage(
       take: 10,
     });
 
-    // Build the user-data-aware system prompt
-    const systemPrompt = await buildUserAIContext(user.id);
+    // Build the user-data-aware system prompt — job-specific if in workspace mode
+    const basePrompt = jobApplicationId
+      ? await buildJobAwareContext(user.id, jobApplicationId)
+      : await buildUserAIContext(user.id);
+    
+    const memory = await getCareerMemoryContext(user.id);
+    const systemPrompt = `${basePrompt}\n\nCAREER MEMORY:\n${memory}`;
 
     // Call Groq with the full context
     const provider = new GroqProvider();

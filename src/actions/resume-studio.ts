@@ -5,6 +5,7 @@ import { prisma, Prisma } from "@/lib/prisma";
 import { createOrGetUser } from "@/lib/clerk";
 import type { ActionResponse } from "@/lib/types";
 import type { ResumeSectionType } from "@prisma/client";
+import { extractCareerMemory } from "@/actions/memory-service";
 
 // ─── Resume CRUD ────────────────────────────────────────────────
 
@@ -20,7 +21,7 @@ export async function getResumes(): Promise<ActionResponse<any[]>> {
   } catch { return { success: false, error: "Failed to load resumes" }; }
 }
 
-export async function createResume(data?: { name?: string }): Promise<ActionResponse<any>> {
+export async function createResume(data?: { name?: string; jobApplicationId?: string }): Promise<ActionResponse<any>> {
   try {
     const user = await createOrGetUser();
     const count = await prisma.resume.count({ where: { userId: user.id } });
@@ -29,6 +30,7 @@ export async function createResume(data?: { name?: string }): Promise<ActionResp
       data: {
         userId: user.id,
         name: data?.name ?? `Resume ${count + 1}`,
+        jobApplicationId: data?.jobApplicationId,
         sections: {
           create: [
             { type: "EXPERIENCE", title: "Work Experience", order: 0, content: { items: [] } },
@@ -125,6 +127,16 @@ export async function updateSection(id: string, data: { title?: string; content?
     if (section.resume.userId !== user.id) return { success: false, error: "Not authorized" };
 
     const updated = await prisma.resumeSection.update({ where: { id }, data: { title: data.title, content: data.content as Prisma.InputJsonValue, order: data.order } });
+    
+    // Extract memory from resume section in the background
+    if (data.content) {
+      const textToExtract = typeof data.content === 'string' ? data.content : JSON.stringify(data.content);
+      // Fire-and-forget memory extraction
+      const fakeReq = { createOrGetUser: async () => ({ id: user.id }) };
+      void fakeReq;
+      extractCareerMemory(`Resume Section (${data.title}):\n${textToExtract}`, "RESUME").catch(e => console.error("[resume] memory extraction error:", e));
+    }
+    
     revalidatePath("/dashboard/resume");
     return { success: true, data: updated };
   } catch { return { success: false, error: "Failed to update section" }; }

@@ -8,7 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { savePractice } from "@/actions/interviews";
+import { savePractice, getJobApplicationPrepContext } from "@/actions/interviews";
+import { getApplications } from "@/actions/applications";
+import { ApplicationCard } from "@/lib/types";
+import { Briefcase, Mail } from "lucide-react";
 
 interface Message {
   role: "assistant" | "user";
@@ -30,9 +33,36 @@ export function MockInterview() {
   const [role, setRole] = useState("");
   const [company, setCompany] = useState("");
   const [completed, setCompleted] = useState(false);
+  
+  const [applications, setApplications] = useState<ApplicationCard[]>([]);
+  const [activeJobId, setActiveJobId] = useState<string>("general");
+  const [prepContext, setPrepContext] = useState<any>(null);
+  const [report, setReport] = useState<string>("");
+
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => { 
+    getApplications().then(res => {
+      if (res.success) setApplications(res.data ?? []);
+    });
+  }, []);
+
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+
+  useEffect(() => {
+    if (activeJobId && activeJobId !== "general") {
+      const app = applications.find(a => a.id === activeJobId);
+      if (app) {
+        setRole(app.role);
+        setCompany(app.company);
+        getJobApplicationPrepContext(app.id).then(res => {
+          if (res.success) setPrepContext(res.data);
+        });
+      }
+    } else {
+      setPrepContext(null);
+    }
+  }, [activeJobId, applications]);
 
   async function startInterview() {
     setLoading(true);
@@ -42,7 +72,14 @@ export function MockInterview() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "mock_interview_start",
-          data: { type, difficulty, role: role || "Software Engineer", company },
+          data: { 
+            type, 
+            difficulty, 
+            role: role || "Software Engineer", 
+            company,
+            jobRequirements: prepContext?.application?.notes || "",
+            careerGaps: prepContext?.careerProfile?.skills?.join(", ") || ""
+          },
         }),
       });
       const data = await res.json();
@@ -77,6 +114,7 @@ export function MockInterview() {
             questionNumber,
             role: role || "Software Engineer",
             type,
+            jobRequirements: prepContext?.application?.notes || "",
           },
         }),
       });
@@ -93,6 +131,7 @@ export function MockInterview() {
 
       if (isFinal) {
         setCompleted(true);
+        const finalScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : undefined;
         // Save practice session
         await savePractice({
           company,
@@ -102,9 +141,24 @@ export function MockInterview() {
           question: "Mock Interview Session",
           userAnswer: messages.map(m => `${m.role}: ${m.content}`).join("\n\n") + `\n\nUser: ${answer}`,
           aiFeedback: { messages: messages.length + 1, scores },
-          score: scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : undefined,
+          score: finalScore,
+          jobApplicationId: activeJobId !== "general" ? activeJobId : undefined
         });
         toast.success("Interview practice saved!");
+        
+        // Generate post-interview learning report if job active
+        if (activeJobId !== "general") {
+           const reportRes = await fetch("/api/interview/ai", {
+             method: "POST",
+             headers: { "Content-Type": "application/json" },
+             body: JSON.stringify({
+               action: "generate_learning_report",
+               data: { role, company, jobRequirements: prepContext?.application?.notes || "", score: finalScore }
+             })
+           });
+           const reportData = await reportRes.json();
+           setReport(reportData.result || "Report generation failed.");
+        }
       } else {
         // Extract next question
         const lines = content.split("\n").filter((l: string) => l.trim().length > 10);
@@ -123,34 +177,87 @@ export function MockInterview() {
     setQuestionNumber(0);
     setScores([]);
     setCompleted(false);
+    setReport("");
   }
 
   if (!started) {
     return (
-      <div className="max-w-lg mx-auto text-center py-12 space-y-6">
-        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-          <Play className="h-8 w-8 text-primary" />
-        </div>
-        <h2 className="text-xl font-bold">Mock Interview</h2>
-        <p className="text-sm text-muted-foreground">Practice with an AI interviewer. Get real-time feedback on your answers.</p>
-        <div className="grid grid-cols-2 gap-3 text-left">
-          <div className="space-y-1"><label className="text-xs font-medium">Interview Type</label>
-            <Select value={type} onValueChange={v => setType(v ?? "")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
-              {["Technical", "Behavioral", "System Design", "HR", "Phone Screen"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-            </SelectContent></Select>
+      <div className="max-w-3xl mx-auto space-y-6">
+        <div className="text-center py-6">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <Play className="h-8 w-8 text-primary" />
           </div>
-          <div className="space-y-1"><label className="text-xs font-medium">Difficulty</label>
-            <Select value={difficulty} onValueChange={v => setDifficulty(v ?? "")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
-              {["Easy", "Medium", "Hard"].map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-            </SelectContent></Select>
-          </div>
-          <div className="space-y-1"><label className="text-xs font-medium">Role</label><Input value={role} onChange={e => setRole(e.target.value)} placeholder="Software Engineer" /></div>
-          <div className="space-y-1"><label className="text-xs font-medium">Company (optional)</label><Input value={company} onChange={e => setCompany(e.target.value)} placeholder="Google" /></div>
+          <h2 className="text-xl font-bold">Mock Interview</h2>
+          <p className="text-sm text-muted-foreground">Practice with an AI interviewer. Get real-time feedback on your answers.</p>
         </div>
-        <Button onClick={startInterview} disabled={loading} className="gap-2">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-          Start Mock Interview
-        </Button>
+        
+        <div className="grid md:grid-cols-2 gap-8">
+          <div className="space-y-4">
+            <h3 className="font-semibold flex items-center gap-2"><Briefcase className="h-4 w-4" /> Interview Setup</h3>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Preparation Mode</label>
+                <Select value={activeJobId} onValueChange={(val) => setActiveJobId(val || "general")}>
+                  <SelectTrigger><SelectValue placeholder="General Practice" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General Practice</SelectItem>
+                    {applications.map(app => (
+                      <SelectItem key={app.id} value={app.id}>
+                        {app.role} at {app.company}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><label className="text-xs font-medium">Interview Type</label>
+                  <Select value={type} onValueChange={v => setType(v ?? "")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+                    {["Technical", "Behavioral", "System Design", "HR", "Phone Screen"].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent></Select>
+                </div>
+                <div className="space-y-1"><label className="text-xs font-medium">Difficulty</label>
+                  <Select value={difficulty} onValueChange={v => setDifficulty(v ?? "")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+                    {["Easy", "Medium", "Hard"].map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  </SelectContent></Select>
+                </div>
+              </div>
+              <div className="space-y-1"><label className="text-xs font-medium">Role</label><Input value={role} onChange={e => setRole(e.target.value)} placeholder="Software Engineer" disabled={activeJobId !== "general"} /></div>
+              <div className="space-y-1"><label className="text-xs font-medium">Company</label><Input value={company} onChange={e => setCompany(e.target.value)} placeholder="Google" disabled={activeJobId !== "general"} /></div>
+            </div>
+            <Button onClick={startInterview} disabled={loading} className="w-full gap-2 mt-4">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+              Start Mock Interview
+            </Button>
+          </div>
+          
+          <div className="space-y-4">
+            {activeJobId !== "general" && prepContext ? (
+              <div className="bg-muted/30 p-4 rounded-xl border space-y-4 h-full">
+                <h3 className="font-semibold flex items-center gap-2 text-sm"><Bot className="h-4 w-4" /> AI Prep Context</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  The AI is using this job&apos;s notes and your career profile gaps to tailor the interview questions specifically for {company}.
+                </p>
+                {prepContext.emails?.length > 0 && (
+                  <div className="space-y-2 mt-4">
+                    <h4 className="text-xs font-semibold flex items-center gap-1"><Mail className="h-3 w-3" /> Relevant Emails</h4>
+                    {prepContext.emails.map((email: any) => (
+                      <div key={email.id} className="text-xs p-2 bg-background border rounded-lg">
+                        <p className="font-medium truncate">{email.subject}</p>
+                        <p className="text-muted-foreground truncate">{email.snippet}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-muted/30 p-4 rounded-xl border flex items-center justify-center h-full text-center text-sm text-muted-foreground flex-col gap-2">
+                <Bot className="h-8 w-8 opacity-20" />
+                <p>Select an active job application to enable personalized interview prep based on your profile and job requirements.</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     );
   }
@@ -210,8 +317,16 @@ export function MockInterview() {
           </Button>
         </div>
       ) : (
-        <div className="p-4 border-t text-center">
-          <Button onClick={resetInterview} className="gap-2"><RotateCcw className="h-4 w-4" /> Start New Interview</Button>
+        <div className="p-4 border-t space-y-4">
+          {report && (
+            <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl space-y-2">
+              <h3 className="font-bold flex items-center gap-2"><Trophy className="h-4 w-4 text-primary" /> Post-Interview Learning Report</h3>
+              <div className="text-sm text-muted-foreground whitespace-pre-wrap">{report}</div>
+            </div>
+          )}
+          <div className="text-center">
+            <Button onClick={resetInterview} className="gap-2"><RotateCcw className="h-4 w-4" /> Start New Interview</Button>
+          </div>
         </div>
       )}
     </div>

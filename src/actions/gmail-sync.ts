@@ -6,14 +6,28 @@ import { GroqProvider } from "@/lib/ai/providers";
 import { revalidatePath } from "next/cache";
 import type { ActionResponse } from "@/lib/types";
 import { z } from "zod";
+import { extractCareerMemory } from "@/actions/memory-service";
+import { extractJobDetails, extractInterviewDetails } from "@/lib/ai/extraction";
+
+// Internal helper to trigger memory extraction after sync (non-blocking)
+async function extractAndStoreMemoryFromGmail(userId: string, text: string) {
+  // We need server-side user context — re-use the userId directly since this is server-side
+  const fakeReq = { createOrGetUser: async () => ({ id: userId }) };
+  void fakeReq; // suppress unused var warning
+  // Call memory service action with gmail source
+  // We skip createOrGetUser here since we already have the userId
+  await prisma.aIUserMemory.findMany({ where: { userId } }); // warm cache
+  return extractCareerMemory(text, "GMAIL");
+}
+
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 const EmailClassificationSchema = z.object({
   category: z.enum([
-    "JOB_OPPORTUNITY", "APPLICATION_CONFIRMATION", "RECRUITER",
-    "INTERVIEW", "INTERVIEW_REMINDER", "REJECTION", "OFFER",
-    "FOLLOW_UP", "CAREER", "NETWORKING", "NEWSLETTER", "PROMOTION", "OTHER",
+    "JOB_OPPORTUNITY", "APPLICATION_CONFIRMATION", "APPLICATION_UPDATE", "RECRUITER_CONTACT", "EMPLOYER_CONTACT",
+    "INTERVIEW_INVITATION", "INTERVIEW_RESCHEDULE", "INTERVIEW_REMINDER", "REJECTION", "OFFER",
+    "FOLLOW_UP", "CAREER_EVENT", "ASSESSMENT", "NETWORKING", "NEWSLETTER", "PROMOTION", "PERSONAL", "OTHER",
   ]),
   confidence: z.number().min(0).max(1),
   jobRelated: z.boolean(),
@@ -25,6 +39,10 @@ const EmailClassificationSchema = z.object({
   role: z.string().optional(),
   summary: z.string().optional(),
   actionRequired: z.boolean().default(false),
+  action: z.string().optional(),
+  urgency: z.number().min(0).max(1).default(0),
+  importance: z.number().min(0).max(1).default(0),
+  replyDraft: z.string().optional(),
 });
 
 type EmailClassification = z.infer<typeof EmailClassificationSchema>;
@@ -51,6 +69,10 @@ interface InboxEmailRecord {
   interviewRelated: boolean;
   rejectionRelated: boolean;
   offerRelated: boolean;
+  urgency: number | null;
+  importance: number | null;
+  action: string | null;
+  replyDraft: string | null;
   createdAt: Date;
 }
 
@@ -95,28 +117,28 @@ function deterministicClassify(subject: string, snippet: string): EmailClassific
   const text = `${subject} ${snippet}`.toLowerCase();
 
   if (/interview|schedule a call|phone screen|video call|hiring manager|we'd like to meet/.test(text)) {
-    return { category: "INTERVIEW", confidence: 0.75, jobRelated: true, applicationRelated: false, interviewRelated: true, rejectionRelated: false, offerRelated: false, actionRequired: true };
+    return { category: "INTERVIEW_INVITATION", confidence: 0.75, jobRelated: true, applicationRelated: false, interviewRelated: true, rejectionRelated: false, offerRelated: false, actionRequired: true, urgency: 0.8, importance: 0.9 };
   }
   if (/unfortunately|not moving forward|not selected|not a fit|other candidates|wish you the best/.test(text)) {
-    return { category: "REJECTION", confidence: 0.8, jobRelated: true, applicationRelated: false, interviewRelated: false, rejectionRelated: true, offerRelated: false, actionRequired: false };
+    return { category: "REJECTION", confidence: 0.8, jobRelated: true, applicationRelated: false, interviewRelated: false, rejectionRelated: true, offerRelated: false, actionRequired: false, urgency: 0.3, importance: 0.7 };
   }
   if (/pleased to offer|offer letter|compensation package|start date|sign your offer/.test(text)) {
-    return { category: "OFFER", confidence: 0.85, jobRelated: true, applicationRelated: false, interviewRelated: false, rejectionRelated: false, offerRelated: true, actionRequired: true };
+    return { category: "OFFER", confidence: 0.85, jobRelated: true, applicationRelated: false, interviewRelated: false, rejectionRelated: false, offerRelated: true, actionRequired: true, urgency: 0.9, importance: 1.0 };
   }
   if (/thank you for applying|application received|application confirmed|we received your/.test(text)) {
-    return { category: "APPLICATION_CONFIRMATION", confidence: 0.8, jobRelated: true, applicationRelated: true, interviewRelated: false, rejectionRelated: false, offerRelated: false, actionRequired: false };
+    return { category: "APPLICATION_CONFIRMATION", confidence: 0.8, jobRelated: true, applicationRelated: true, interviewRelated: false, rejectionRelated: false, offerRelated: false, actionRequired: false, urgency: 0.2, importance: 0.5 };
   }
   if (/job opportunity|open position|hiring|we are looking for|exciting role|are you interested/.test(text)) {
-    return { category: "JOB_OPPORTUNITY", confidence: 0.7, jobRelated: true, applicationRelated: false, interviewRelated: false, rejectionRelated: false, offerRelated: false, actionRequired: true };
+    return { category: "JOB_OPPORTUNITY", confidence: 0.7, jobRelated: true, applicationRelated: false, interviewRelated: false, rejectionRelated: false, offerRelated: false, actionRequired: true, urgency: 0.6, importance: 0.6 };
   }
   if (/recruiter|talent acquisition|sourcing|linkedin recruiter|i came across your profile/.test(text)) {
-    return { category: "RECRUITER", confidence: 0.7, jobRelated: true, applicationRelated: false, interviewRelated: false, rejectionRelated: false, offerRelated: false, actionRequired: true };
+    return { category: "RECRUITER_CONTACT", confidence: 0.7, jobRelated: true, applicationRelated: false, interviewRelated: false, rejectionRelated: false, offerRelated: false, actionRequired: true, urgency: 0.5, importance: 0.6 };
   }
   if (/follow.?up|checking in|wanted to follow|any update/.test(text)) {
-    return { category: "FOLLOW_UP", confidence: 0.65, jobRelated: true, applicationRelated: false, interviewRelated: false, rejectionRelated: false, offerRelated: false, actionRequired: true };
+    return { category: "FOLLOW_UP", confidence: 0.65, jobRelated: true, applicationRelated: false, interviewRelated: false, rejectionRelated: false, offerRelated: false, actionRequired: true, urgency: 0.7, importance: 0.5 };
   }
 
-  return { category: "OTHER", confidence: 0.5, jobRelated: false, applicationRelated: false, interviewRelated: false, rejectionRelated: false, offerRelated: false, actionRequired: false };
+  return { category: "OTHER", confidence: 0.5, jobRelated: false, applicationRelated: false, interviewRelated: false, rejectionRelated: false, offerRelated: false, actionRequired: false, urgency: 0.1, importance: 0.1 };
 }
 
 async function aiClassifyEmail(
@@ -136,7 +158,7 @@ Snippet: ${snippet}
 
 Respond ONLY with a JSON object matching this schema (no markdown, no extra text):
 {
-  "category": "JOB_OPPORTUNITY|APPLICATION_CONFIRMATION|RECRUITER|INTERVIEW|INTERVIEW_REMINDER|REJECTION|OFFER|FOLLOW_UP|CAREER|NETWORKING|NEWSLETTER|PROMOTION|OTHER",
+  "category": "JOB_OPPORTUNITY|APPLICATION_CONFIRMATION|APPLICATION_UPDATE|RECRUITER_CONTACT|EMPLOYER_CONTACT|INTERVIEW_INVITATION|INTERVIEW_RESCHEDULE|INTERVIEW_REMINDER|REJECTION|OFFER|FOLLOW_UP|CAREER_EVENT|ASSESSMENT|NETWORKING|NEWSLETTER|PROMOTION|PERSONAL|OTHER",
   "confidence": 0.0-1.0,
   "jobRelated": boolean,
   "applicationRelated": boolean,
@@ -146,7 +168,11 @@ Respond ONLY with a JSON object matching this schema (no markdown, no extra text
   "company": "company name if found",
   "role": "job title if found",
   "summary": "1-sentence summary",
-  "actionRequired": boolean
+  "actionRequired": boolean,
+  "action": "Recommended next action (e.g. 'Prepare for interview', 'Reply to recruiter') or null",
+  "urgency": 0.0-1.0,
+  "importance": 0.0-1.0,
+  "replyDraft": "Generate a short polite email reply if actionRequired is true and it makes sense, otherwise null"
 }`;
 
   try {
@@ -253,6 +279,11 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
             interviewRelated: classification.interviewRelated,
             rejectionRelated: classification.rejectionRelated,
             offerRelated: classification.offerRelated,
+            urgency: classification.urgency,
+            importance: classification.importance,
+            action: classification.action ?? null,
+            replyDraft: classification.replyDraft ?? null,
+            jobApplicationId: null, // Default to null, we will update it below if we find a match
           },
           update: {
             isRead,
@@ -263,36 +294,183 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
 
         emailsProcessed++;
 
-        // Job Discovery: if it's a job opportunity or recruiter email with a company/role
-        if (
-          (classification.category === "JOB_OPPORTUNITY" || classification.category === "RECRUITER") &&
-          classification.company &&
-          classification.role
-        ) {
-          const company = classification.company.trim();
-          const title = classification.role.trim();
+        // Job Discovery & Normalization
+        let linkedJobAppId: string | null = null;
 
-          // Avoid duplicates
-          const existing = await prisma.discoveredJob.findFirst({
+        if (classification.category === "JOB_OPPORTUNITY") {
+          const jobDetails = await extractJobDetails(subject, snippet);
+          const company = jobDetails?.company || classification.company?.trim() || "";
+          const title = jobDetails?.title || classification.role?.trim() || "";
+
+          if (company && title) {
+            // 1. Check if an active JobApplication already exists
+            const existingApp = await prisma.jobApplication.findFirst({
+              where: {
+                userId: user.id,
+                company: { equals: company, mode: "insensitive" },
+                role: { equals: title, mode: "insensitive" },
+              }
+            });
+
+            if (existingApp) {
+              linkedJobAppId = existingApp.id;
+            } else {
+              // 2. No active app found, check if DiscoveredJob exists
+              const existingDiscovered = await prisma.discoveredJob.findFirst({
+                where: {
+                  userId: user.id,
+                  company: { equals: company, mode: "insensitive" },
+                  title: { equals: title, mode: "insensitive" },
+                },
+              });
+
+              if (!existingDiscovered) {
+                await prisma.discoveredJob.create({
+                  data: {
+                    userId: user.id,
+                    sourceEmailId: savedEmail.id,
+                    title,
+                    company,
+                    location: jobDetails?.location || null,
+                    employmentType: jobDetails?.employmentType || null,
+                    remoteType: jobDetails?.remoteType || null,
+                    salaryMin: jobDetails?.salaryMin || null,
+                    salaryMax: jobDetails?.salaryMax || null,
+                    salaryCurrency: jobDetails?.salaryCurrency || null,
+                    status: "NEW",
+                  },
+                });
+                jobsDiscovered++;
+              }
+            }
+          }
+        } else if (classification.category === "INTERVIEW_INVITATION" || classification.category === "INTERVIEW_RESCHEDULE") {
+          const interviewDetails = await extractInterviewDetails(subject, snippet);
+          const company = classification.company?.trim() || "Unknown Company";
+          const title = classification.role?.trim() || "Unknown Role";
+          
+          if (interviewDetails && interviewDetails.date) {
+            const scheduledAt = new Date(interviewDetails.date);
+            if (!isNaN(scheduledAt.getTime())) {
+              // Try to link to an application
+              const existingApp = await prisma.jobApplication.findFirst({
+                where: {
+                  userId: user.id,
+                  company: { equals: company, mode: "insensitive" },
+                },
+                orderBy: { createdAt: 'desc' }
+              });
+
+              if (existingApp) {
+                linkedJobAppId = existingApp.id;
+              }
+
+              // Create interview
+              await prisma.interview.create({
+                data: {
+                  userId: user.id,
+                  company,
+                  position: title,
+                  scheduledAt,
+                  location: interviewDetails.location || null,
+                  meetingLink: interviewDetails.meetingUrl || null,
+                  notes: interviewDetails.instructions || null,
+                  applicationId: existingApp?.id || null,
+                }
+              });
+            }
+          }
+        } else if (classification.company && classification.role) {
+          const existingApp = await prisma.jobApplication.findFirst({
             where: {
               userId: user.id,
-              company: { equals: company, mode: "insensitive" },
-              title: { equals: title, mode: "insensitive" },
+              company: { equals: classification.company.trim(), mode: "insensitive" },
+              role: { equals: classification.role.trim(), mode: "insensitive" },
+            }
+          });
+          if (existingApp) {
+            linkedJobAppId = existingApp.id;
+          }
+        }
+
+        // ─── Recruiter Contact Extraction ──────────────────────────────────
+        if (
+          (classification.category === "RECRUITER_CONTACT" || classification.category === "EMPLOYER_CONTACT") &&
+          senderEmail
+        ) {
+          const existingContact = await prisma.recruiterContact.findFirst({
+            where: {
+              userId: user.id,
+              email: { equals: senderEmail, mode: "insensitive" },
             },
           });
 
-          if (!existing) {
-            await prisma.discoveredJob.create({
+          if (existingContact) {
+            const sourceIds = existingContact.sourceEmailIds.includes(savedEmail.id)
+              ? existingContact.sourceEmailIds
+              : [...existingContact.sourceEmailIds, savedEmail.id];
+            await prisma.recruiterContact.update({
+              where: { id: existingContact.id },
               data: {
-                userId: user.id,
-                sourceEmailId: savedEmail.id,
-                title,
-                company,
-                status: "NEW",
+                communicationCount: { increment: 1 },
+                lastContactedAt: receivedAt ?? new Date(),
+                sourceEmailIds: sourceIds,
               },
             });
-            jobsDiscovered++;
+          } else {
+            await prisma.recruiterContact.create({
+              data: {
+                userId: user.id,
+                name: sender || "Unknown",
+                email: senderEmail,
+                company: classification.company?.trim() || null,
+                role: classification.role?.trim() || null,
+                relationship: classification.category === "RECRUITER_CONTACT" ? "RECRUITER" : "EMPLOYER",
+                lastContactedAt: receivedAt ?? new Date(),
+                communicationCount: 1,
+                sourceEmailIds: [savedEmail.id],
+              },
+            });
           }
+        }
+
+        // ─── Career Reminder / Deadline Extraction ───────────────────────────
+        if (classification.category === "ASSESSMENT" || classification.category === "INTERVIEW_INVITATION") {
+          // Create a career reminder for interviews and assessments
+          const interviewDetails = classification.category === "INTERVIEW_INVITATION"
+            ? await extractInterviewDetails(subject, snippet).catch(() => null)
+            : null;
+          const deadlineDate = interviewDetails?.date ? new Date(interviewDetails.date) : null;
+
+          if (deadlineDate && !isNaN(deadlineDate.getTime())) {
+            const reminderType = classification.category === "ASSESSMENT" ? "ASSESSMENT_DEADLINE" : "INTERVIEW_DATE";
+            const existingReminder = await prisma.careerReminder.findFirst({
+              where: {
+                userId: user.id,
+                sourceEmailId: savedEmail.id,
+              },
+            });
+
+            if (!existingReminder) {
+              await prisma.careerReminder.create({
+                data: {
+                  userId: user.id,
+                  type: reminderType,
+                  date: deadlineDate,
+                  confidence: classification.confidence,
+                  sourceEmailId: savedEmail.id,
+                  title: classification.summary || subject || "Career deadline",
+                },
+              });
+            }
+          }
+        }
+
+        if (linkedJobAppId) {
+          await prisma.emailMessage.update({
+            where: { id: savedEmail.id },
+            data: { jobApplicationId: linkedJobAppId }
+          });
         }
       } catch (msgErr) {
         // Log but continue processing remaining messages
@@ -305,6 +483,31 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
       where: { userId: user.id },
       data: { lastSyncedAt: new Date() },
     });
+
+    // ─── Memory Extraction ────────────────────────────────────────────────────
+    // Asynchronously extract career signals from job-related emails
+    // e.g. "Recruiter from Google emailed about a Senior React role" → skills, companies
+    try {
+      const jobEmails = await prisma.emailMessage.findMany({
+        where: { userId: user.id, jobRelated: true },
+        orderBy: { receivedAt: "desc" },
+        take: 20,
+        select: { subject: true, sender: true, snippet: true, category: true },
+      });
+
+      if (jobEmails.length > 0) {
+        const memoryText = jobEmails
+          .map(e => `[${e.category}] From: ${e.sender ?? ""} | ${e.subject ?? ""} | ${e.snippet ?? ""}`)
+          .join("\n");
+
+        // Fire-and-forget — don't fail sync if memory extraction fails
+        extractAndStoreMemoryFromGmail(user.id, memoryText).catch(err =>
+          console.error("[gmail-sync] memory extraction error:", err)
+        );
+      }
+    } catch (memErr) {
+      console.error("[gmail-sync] memory extraction setup error:", memErr);
+    }
 
     revalidatePath("/dashboard");
     return {

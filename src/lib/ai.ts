@@ -79,10 +79,15 @@ const ResumeMatchSchema = z.object({
 
 export type ResumeMatch = z.infer<typeof ResumeMatchSchema>;
 
-export async function matchResume(resumeText: string, jobDescription: string): Promise<ResumeMatch> {
+export async function matchResume(resumeText: string, jobDescription: string, careerProfileText?: string): Promise<ResumeMatch> {
   const systemPrompt = `Compare the resume text below with the provided job description. Give a match percentage (0-100), list of matched skills, missing skills, priority skills to learn, recommended courses (short names), recommended certifications, and 3 specific tailored resume changes. Output only valid JSON.`;
 
-  const result = await groqChat(systemPrompt, `RESUME:\n${resumeText}\n\nJOB DESCRIPTION:\n${jobDescription}`);
+  let userContent = `RESUME:\n${resumeText}\n\nJOB DESCRIPTION:\n${jobDescription}`;
+  if (careerProfileText) {
+    userContent += `\n\nCAREER PROFILE:\n${careerProfileText}`;
+  }
+
+  const result = await groqChat(systemPrompt, userContent);
   const parsed = JSON.parse(result.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
   return ResumeMatchSchema.parse(parsed);
 }

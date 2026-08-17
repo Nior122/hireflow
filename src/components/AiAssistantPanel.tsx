@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Sparkles, Loader2, Wand2, Pencil, Search, ArrowUp } from "lucide-react";
+import { Sparkles, Loader2, Wand2, Pencil, Search, ArrowUp, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ const AI_ACTIONS = [
   { id: "generate_achievements", label: "Generate Achievements", icon: ArrowUp, description: "Create quantified achievement bullets" },
   { id: "fix_grammar", label: "Fix Grammar", icon: Pencil, description: "Correct errors and improve clarity" },
   { id: "ats_keywords", label: "ATS Keywords", icon: Search, description: "Extract and suggest keywords" },
+  { id: "highlight_skills", label: "Highlight Skills", icon: Sparkles, description: "Highlight skills based on Career Profile" },
 ];
 
 export function AiAssistantPanel({ resumeText, onResult }: Props) {
@@ -104,7 +105,37 @@ export function AiAssistantPanel({ resumeText, onResult }: Props) {
         <div className="space-y-2">
           <p className="text-[10px] font-medium text-muted-foreground">Result</p>
           <div className="p-3 rounded-lg bg-muted/30 text-xs whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto">
-            {result}
+            {(() => {
+              try {
+                const parsed = JSON.parse(result);
+                if (parsed.not_in_profile && Array.isArray(parsed.not_in_profile) && parsed.not_in_profile.length > 0) {
+                  return (
+                    <div className="space-y-3">
+                      <div className="p-2 rounded bg-amber-500/10 border border-amber-500/20 text-amber-500 flex flex-col gap-1">
+                        <span className="font-semibold flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Missing Skills
+                        </span>
+                        <span className="text-[10px]">
+                          The following suggested skills are NOT in your Career Profile. You may want to add them if you have this experience:
+                        </span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {parsed.not_in_profile.map((s: string, i: number) => (
+                            <Badge key={i} variant="outline" className="text-[9px] bg-amber-500/5 text-amber-500 border-amber-500/30">{s}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        {JSON.stringify({ ...parsed, not_in_profile: undefined }, null, 2)}
+                      </div>
+                    </div>
+                  );
+                }
+                return result;
+              } catch {
+                return result;
+              }
+            })()}
           </div>
         </div>
       )}

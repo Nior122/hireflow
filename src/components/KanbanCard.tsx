@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { STATUS_LABELS, STATUS_COLORS, type ApplicationCard, type ApplicationStatus } from "@/lib/types";
+import Link from "next/link";
 import { EditApplicationDialog } from "./EditApplicationDialog";
 import { DeleteApplicationAlert } from "./DeleteApplicationAlert";
 import { ActivityTimeline } from "./ActivityTimeline";
@@ -87,9 +88,9 @@ export function KanbanCard({ application, isDragging }: KanbanCardProps) {
               </Button>
               <ActivityTimeline applicationId={application.id} applicationCompany={application.company} />
               <ReminderPanel applicationId={application.id} />
-              <Button variant="ghost" size="xs" className="gap-1 text-amber-600" onClick={e => { e.stopPropagation(); setResumeOpen(true); }}>
+              <Button render={<Link href={`/dashboard/jobs/${application.id}`} onClick={e => e.stopPropagation()} />} variant="ghost" size="xs" className="gap-1 text-primary">
                 <Sparkles className="h-3 w-3" />
-                Match
+                Workspace
               </Button>
             </div>
           </CardContent>

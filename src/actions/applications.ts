@@ -6,6 +6,7 @@ import { createOrGetUser } from "@/lib/clerk";
 import { logActivity } from "@/actions/activities";
 import { createApplicationSchema, updateApplicationSchema, type ApplicationCard, type ActionResponse, type ApplicationStatus } from "@/lib/types";
 import { logger } from "@/lib/monitoring/logger";
+import { extractCareerMemory } from "@/actions/memory-service";
 
 export async function getApplications(): Promise<ActionResponse<ApplicationCard[]>> {
   try {
@@ -32,6 +33,12 @@ export async function createApplication(formData: FormData): Promise<ActionRespo
     const application = await prisma.jobApplication.create({
       data: { ...data, status, position: (lastApp?.position ?? -1) + 1, userId: user.id },
     });
+    
+    // Background memory extraction
+    const fakeReq = { createOrGetUser: async () => ({ id: user.id }) };
+    void fakeReq;
+    extractCareerMemory(`Applied for ${application.role} at ${application.company}. ${application.notes ? "Notes: " + application.notes : ""}`, "APPLICATION").catch(e => console.error("[app] memory extract error", e));
+
     await logActivity(user.id, "APPLICATION_CREATED", `Created application: ${application.role} at ${application.company}`, application.id);
     revalidatePath("/dashboard");
     return { success: true, data: application as ApplicationCard };
@@ -54,6 +61,9 @@ export async function updateApplication(id: string, formData: FormData): Promise
     // Log relevant changes
     if (parsed.data.notes && parsed.data.notes !== existing.notes) {
       await logActivity(user.id, "NOTE_UPDATED", `Updated notes for ${existing.company}`, id);
+      const fakeReq = { createOrGetUser: async () => ({ id: user.id }) };
+      void fakeReq;
+      extractCareerMemory(`Notes for ${existing.role} at ${existing.company}: ${parsed.data.notes}`, "APPLICATION").catch(e => console.error("[app] memory extract error", e));
     }
     if (parsed.data.status && parsed.data.status !== existing.status) {
       await logActivity(user.id, "STATUS_CHANGED", `Status changed to ${parsed.data.status} for ${existing.company}`, id);

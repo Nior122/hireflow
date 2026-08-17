@@ -18,6 +18,8 @@ const StatsSection = dynamic(() => import("./StatsSection").then(m => ({ default
 const EmailDigestPanel = dynamic(() => import("./EmailDigestPanel").then(m => ({ default: m.EmailDigestPanel })), { loading: () => <Skeleton className="h-32 rounded-xl" />, ssr: false });
 const UpcomingInterviewsWidget = dynamic(() => import("./UpcomingInterviewsWidget").then(m => ({ default: m.UpcomingInterviewsWidget })), { ssr: false });
 const SkillGapsWidget = dynamic(() => import("./SkillGapsWidget").then(m => ({ default: m.SkillGapsWidget })), { ssr: false });
+const PriorityCards = dynamic(() => import("./PriorityCards").then(m => ({ default: m.PriorityCards })), { ssr: false });
+const EmailActionCenter = dynamic(() => import("./EmailActionCenter").then(m => ({ default: m.EmailActionCenter })), { ssr: false });
 
 interface Props { userId: string; widgets: DashboardWidgets; }
 
@@ -124,6 +126,10 @@ export function JobSeekerDashboard({ userId, widgets }: Props) {
       )}
       
       {widgets.showStats && <StatsSection applications={apps} />}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <PriorityCards />
+        <EmailActionCenter />
+      </div>
       <SearchFilterBar applications={apps} onFilterChange={handleFilterChange} />
       {isFiltering && filteredApps.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">

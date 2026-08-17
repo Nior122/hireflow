@@ -44,6 +44,7 @@ export function Header() {
     { href: "/dashboard/resume", label: "Resume Studio", icon: FileText, active: pathname?.startsWith("/dashboard/resume") },
     { href: "/dashboard/interviews", label: "Interview Center", icon: Video, active: pathname?.startsWith("/dashboard/interviews") },
     { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, active: pathname?.startsWith("/dashboard/analytics") },
+    { href: "/dashboard/settings", label: "Settings", icon: Settings, active: pathname?.startsWith("/dashboard/settings") },
   ];
 
   return (

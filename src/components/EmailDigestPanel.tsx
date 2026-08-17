@@ -7,6 +7,8 @@ import {
   Mail, Loader2, Inbox, Plug, Unplug, RefreshCw,
   Search, Filter, CheckCircle2, AlertCircle, Clock,
   Briefcase, UserCheck, XCircle, CalendarCheck, Gift,
+  Star, Megaphone, Users, FileCheck, MessageSquare, Award,
+  ArrowRight, Copy, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,18 +36,31 @@ interface EmailRecord {
   interviewRelated: boolean;
   rejectionRelated: boolean;
   offerRelated: boolean;
+  urgency: number | null;
+  importance: number | null;
+  action: string | null;
+  replyDraft: string | null;
   createdAt: Date;
 }
 
 const CATEGORY_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
   JOB_OPPORTUNITY: { label: "Job Opportunity", icon: <Briefcase className="h-3 w-3" />, color: "bg-blue-500/10 text-blue-600 border-blue-200" },
-  RECRUITER: { label: "Recruiter", icon: <UserCheck className="h-3 w-3" />, color: "bg-purple-500/10 text-purple-600 border-purple-200" },
-  INTERVIEW: { label: "Interview", icon: <CalendarCheck className="h-3 w-3" />, color: "bg-emerald-500/10 text-emerald-600 border-emerald-200" },
-  INTERVIEW_REMINDER: { label: "Interview Reminder", icon: <CalendarCheck className="h-3 w-3" />, color: "bg-emerald-500/10 text-emerald-600 border-emerald-200" },
+  APPLICATION_CONFIRMATION: { label: "Application Confirmed", icon: <CheckCircle2 className="h-3 w-3" />, color: "bg-teal-500/10 text-teal-600 border-teal-200" },
+  APPLICATION_UPDATE: { label: "Application Update", icon: <FileCheck className="h-3 w-3" />, color: "bg-cyan-500/10 text-cyan-600 border-cyan-200" },
+  RECRUITER_CONTACT: { label: "Recruiter", icon: <UserCheck className="h-3 w-3" />, color: "bg-purple-500/10 text-purple-600 border-purple-200" },
+  EMPLOYER_CONTACT: { label: "Employer", icon: <Users className="h-3 w-3" />, color: "bg-violet-500/10 text-violet-600 border-violet-200" },
+  INTERVIEW_INVITATION: { label: "Interview", icon: <CalendarCheck className="h-3 w-3" />, color: "bg-emerald-500/10 text-emerald-600 border-emerald-200" },
+  INTERVIEW_RESCHEDULE: { label: "Rescheduled", icon: <CalendarCheck className="h-3 w-3" />, color: "bg-amber-500/10 text-amber-600 border-amber-200" },
+  INTERVIEW_REMINDER: { label: "Interview Reminder", icon: <Clock className="h-3 w-3" />, color: "bg-emerald-500/10 text-emerald-600 border-emerald-200" },
   REJECTION: { label: "Rejection", icon: <XCircle className="h-3 w-3" />, color: "bg-red-500/10 text-red-600 border-red-200" },
   OFFER: { label: "Offer", icon: <Gift className="h-3 w-3" />, color: "bg-amber-500/10 text-amber-600 border-amber-200" },
-  APPLICATION_CONFIRMATION: { label: "Application Confirmed", icon: <CheckCircle2 className="h-3 w-3" />, color: "bg-teal-500/10 text-teal-600 border-teal-200" },
   FOLLOW_UP: { label: "Follow Up", icon: <Mail className="h-3 w-3" />, color: "bg-sky-500/10 text-sky-600 border-sky-200" },
+  CAREER_EVENT: { label: "Career Event", icon: <Star className="h-3 w-3" />, color: "bg-indigo-500/10 text-indigo-600 border-indigo-200" },
+  ASSESSMENT: { label: "Assessment", icon: <Award className="h-3 w-3" />, color: "bg-orange-500/10 text-orange-600 border-orange-200" },
+  NETWORKING: { label: "Networking", icon: <Users className="h-3 w-3" />, color: "bg-pink-500/10 text-pink-600 border-pink-200" },
+  NEWSLETTER: { label: "Newsletter", icon: <Megaphone className="h-3 w-3" />, color: "bg-gray-500/10 text-gray-600 border-gray-200" },
+  PROMOTION: { label: "Promotion", icon: <Megaphone className="h-3 w-3" />, color: "bg-yellow-500/10 text-yellow-600 border-yellow-200" },
+  PERSONAL: { label: "Personal", icon: <MessageSquare className="h-3 w-3" />, color: "bg-slate-500/10 text-slate-600 border-slate-200" },
   OTHER: { label: "Other", icon: <Mail className="h-3 w-3" />, color: "bg-muted text-muted-foreground border-border" },
 };
 
@@ -64,6 +79,8 @@ export function EmailDigestPanel() {
   const [syncing, startSync] = useTransition();
   const [importing, startImport] = useTransition();
   const [importedIds, setImportedIds] = useState<Set<string>>(new Set());
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [expandedDraft, setExpandedDraft] = useState<string | null>(null);
 
   const [gmailConnected, setGmailConnected] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{
@@ -195,6 +212,11 @@ export function EmailDigestPanel() {
     });
   }
 
+  function handleDismiss(emailId: string) {
+    setDismissedIds(prev => new Set([...prev, emailId]));
+    toast.success("Email dismissed");
+  }
+
   // Client-side search filter
   const visible = emails.filter(e => {
     if (!searchQuery) return true;
@@ -320,11 +342,13 @@ export function EmailDigestPanel() {
             <DropdownMenuContent align="end" className="text-xs">
               <DropdownMenuItem onClick={() => setCategoryFilter(null)}>All Categories</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCategoryFilter("JOB_OPPORTUNITY")}>Job Opportunity</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setCategoryFilter("RECRUITER")}>Recruiter</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setCategoryFilter("INTERVIEW")}>Interview</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCategoryFilter("RECRUITER_CONTACT")}>Recruiter</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCategoryFilter("INTERVIEW_INVITATION")}>Interview</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCategoryFilter("REJECTION")}>Rejection</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCategoryFilter("OFFER")}>Offer</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCategoryFilter("APPLICATION_CONFIRMATION")}>Application Confirmed</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCategoryFilter("ASSESSMENT")}>Assessment</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCategoryFilter("FOLLOW_UP")}>Follow Up</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -333,9 +357,20 @@ export function EmailDigestPanel() {
       {/* Email List */}
       <div className="space-y-2">
         <AnimatePresence>
+          {visible.length === 0 && !loading && (
+            <div className="text-center py-12 text-muted-foreground border rounded-lg bg-muted/20">
+              <Inbox className="h-8 w-8 mx-auto mb-3 opacity-20" />
+              <p>No actionable emails found.</p>
+              {(searchQuery || categoryFilter) && (
+                <Button variant="link" onClick={() => { setSearchQuery(""); setCategoryFilter(null); }} className="mt-2 text-xs h-auto p-0">Clear filters</Button>
+              )}
+            </div>
+          )}
           {visible.map((email, i) => {
             const meta = getCategoryMeta(email.category);
             const isImported = importedIds.has(email.id);
+            const isDismissed = dismissedIds.has(email.id);
+            if (isDismissed) return null;
 
             return (
               <motion.div
@@ -348,6 +383,14 @@ export function EmailDigestPanel() {
                 <Card className={`transition-opacity ${isImported ? "opacity-50" : ""} ${!email.isRead ? "border-primary/30" : ""}`}>
                   <CardContent className="p-3">
                     <div className="flex items-start gap-3">
+                      {/* Urgency dot */}
+                      <div className="mt-1.5 shrink-0">
+                        <span className={`block h-2.5 w-2.5 rounded-full ${
+                          (email.urgency ?? 0) > 0.7 ? "bg-red-500 shadow-sm shadow-red-500/50" :
+                          (email.urgency ?? 0) > 0.4 ? "bg-orange-400" :
+                          (email.importance ?? 0) > 0.5 ? "bg-yellow-400" : "bg-gray-300"
+                        }`} />
+                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border font-medium ${meta.color}`}>
@@ -355,6 +398,11 @@ export function EmailDigestPanel() {
                           </span>
                           {!email.isRead && (
                             <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" title="Unread" />
+                          )}
+                          {email.action && (
+                            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                              <ArrowRight className="h-2.5 w-2.5" /> {email.action}
+                            </span>
                           )}
                         </div>
                         <h4 className="font-medium text-sm mt-1 truncate">{email.subject || "(No Subject)"}</h4>
@@ -369,9 +417,50 @@ export function EmailDigestPanel() {
                         {email.snippet && (
                           <p className="text-xs text-muted-foreground mt-1 line-clamp-2 opacity-80">{email.snippet}</p>
                         )}
+
+                        {/* Reply Draft expandable */}
+                        {email.replyDraft && (
+                          <div className="mt-2">
+                            <button
+                              onClick={() => setExpandedDraft(expandedDraft === email.id ? null : email.id)}
+                              className="inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 font-medium transition-colors"
+                            >
+                              <MessageSquare className="h-3 w-3" />
+                              {expandedDraft === email.id ? "Hide" : "View"} Reply Draft
+                              {expandedDraft === email.id ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                            </button>
+                            {expandedDraft === email.id && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="mt-2 p-3 rounded-lg bg-muted/50 border text-xs whitespace-pre-wrap"
+                              >
+                                {email.replyDraft}
+                                <button
+                                  onClick={() => { navigator.clipboard.writeText(email.replyDraft!); toast.success("Copied to clipboard"); }}
+                                  className="mt-2 inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 font-medium"
+                                >
+                                  <Copy className="h-3 w-3" /> Copy
+                                </button>
+                              </motion.div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       <div className="shrink-0 flex items-center gap-1">
+                        {!isImported && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleDismiss(email.id)}
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            title="Dismiss"
+                          >
+                            <XCircle className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         {email.applicationRelated || email.jobRelated || email.interviewRelated || email.offerRelated ? (
                           isImported ? (
                             <Badge className="text-[10px] bg-emerald-500/10 text-emerald-600">

@@ -6,6 +6,7 @@ import type { InterviewStatus } from "@prisma/client";
 import { createOrGetUser } from "@/lib/clerk";
 import type { ActionResponse } from "@/lib/types";
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, getCalendarStatus } from "./calendar";
+import { extractCareerMemory } from "@/actions/memory-service";
 
 // ─── Interviews CRUD ────────────────────────────────────────────
 
@@ -115,6 +116,14 @@ export async function updateInterview(id: string, data: {
     }
 
     const interview = await prisma.interview.update({ where: { id }, data: update });
+    
+    // Background memory extraction from interview notes
+    if (data.notes && data.notes !== existing.notes) {
+      const fakeReq = { createOrGetUser: async () => ({ id: user.id }) };
+      void fakeReq;
+      extractCareerMemory(`Interview with ${interview.company} for ${interview.position} role. Notes: ${data.notes}`, "INTERVIEW").catch(e => console.error("[interview] memory extract error", e));
+    }
+    
     revalidatePath("/dashboard/interviews");
     return { success: true, data: interview };
   } catch { return { success: false, error: "Failed to update" }; }
@@ -144,6 +153,7 @@ export async function deleteInterview(id: string): Promise<ActionResponse<void>>
 export async function savePractice(data: {
   interviewId?: string; company?: string; role?: string; category: string;
   difficulty: string; question: string; userAnswer: string; aiFeedback?: unknown; score?: number;
+  jobApplicationId?: string;
 }): Promise<ActionResponse<any>> {
   try {
     const user = await createOrGetUser();
@@ -151,6 +161,7 @@ export async function savePractice(data: {
       data: {
         userId: user.id,
         interviewId: data.interviewId ?? null,
+        jobApplicationId: data.jobApplicationId ?? null,
         company: data.company ?? null,
         role: data.role ?? null,
         category: data.category,
@@ -248,4 +259,49 @@ export async function getInterviewAnalytics(): Promise<ActionResponse<{
       },
     };
   } catch { return { success: false, error: "Failed to compute analytics" }; }
+}
+
+// ─── Prep Context ───────────────────────────────────────────────
+
+export async function getJobApplicationPrepContext(applicationId: string): Promise<ActionResponse<{
+  application: any;
+  careerProfile: any;
+  emails: any[];
+}>> {
+  try {
+    const user = await createOrGetUser();
+    
+    const application = await prisma.jobApplication.findFirst({
+      where: { id: applicationId, userId: user.id },
+    });
+    
+    if (!application) return { success: false, error: "Application not found" };
+
+    const careerProfile = await prisma.aIUserProfile.findFirst({
+      where: { userId: user.id },
+    });
+
+    const emails = await prisma.emailMessage.findMany({
+      where: {
+        userId: user.id,
+        interviewRelated: true,
+        OR: [
+          { sender: { contains: application.company, mode: "insensitive" } },
+          { subject: { contains: application.company, mode: "insensitive" } },
+          { snippet: { contains: application.company, mode: "insensitive" } },
+        ]
+      },
+      orderBy: { receivedAt: "desc" },
+      take: 5
+    });
+
+    return {
+      success: true,
+      data: {
+        application,
+        careerProfile,
+        emails
+      }
+    };
+  } catch { return { success: false, error: "Failed to load prep context" }; }
 }

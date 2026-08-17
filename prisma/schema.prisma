@@ -12,62 +12,66 @@ enum Role {
 }
 
 model User {
-  id               String              @id @default(cuid())
-  clerkId          String              @unique
-  role             Role                @default(JOB_SEEKER)
-  email            String?
-  companyName      String?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  applications     JobApplication[]
-  candidates       Candidate[]
-  emailTemplates   EmailTemplate[]
-  gmailToken       GmailToken?
-  calendarConnection CalendarConnection?
-  activities       ActivityLog[]
-  reminders        Reminder[]
-  savedJobs        SavedJob[]
-  conversations    Conversation[]
-  resumes          Resume[]
-  coverLetters     CoverLetter[]
-  interviews       Interview[]
-  interviewQuestions InterviewQuestion[]
-  orgMemberships   OrganizationMember[]
-  orgInvitationsSent OrganizationInvitation[]
-  auditLogs        AuditLog[]
-  teamComments     TeamComment[]
-  scorecards       CandidateScorecard[]
-  assignedCandidates Candidate[]    @relation("AssignedToRecruiter")
-  hiringManagerCandidates Candidate[] @relation("HiringManager")
-  hiringManagerOnJobPostings JobPosting[] @relation("HiringManagerOnPosting")
-  managedJobPostings JobPosting[] @relation("ManagedJobPostings")
-  interviewersOnJobs JobPosting[]  @relation("InterviewerOnJobs")
-  subscription      Subscription?
-  apiKeys           ApiKey[]
-  usageRecords      UsageRecord[]
-  interviewPractices InterviewPractice[]
-  notificationPrefs Json?
-  dashboardWidgets  Json?
-  careerProfile     CareerProfile?
-  emailMessages     EmailMessage[]
-  discoveredJobs    DiscoveredJob[]
+  id                         String                   @id @default(cuid())
+  clerkId                    String                   @unique
+  role                       Role                     @default(JOB_SEEKER)
+  email                      String?
+  companyName                String?
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
+  applications               JobApplication[]
+  candidates                 Candidate[]
+  emailTemplates             EmailTemplate[]
+  gmailToken                 GmailToken?
+  calendarConnection         CalendarConnection?
+  activities                 ActivityLog[]
+  reminders                  Reminder[]
+  savedJobs                  SavedJob[]
+  conversations              Conversation[]
+  resumes                    Resume[]
+  coverLetters               CoverLetter[]
+  interviews                 Interview[]
+  interviewQuestions         InterviewQuestion[]
+  orgMemberships             OrganizationMember[]
+  orgInvitationsSent         OrganizationInvitation[]
+  auditLogs                  AuditLog[]
+  teamComments               TeamComment[]
+  scorecards                 CandidateScorecard[]
+  assignedCandidates         Candidate[]              @relation("AssignedToRecruiter")
+  hiringManagerCandidates    Candidate[]              @relation("HiringManager")
+  hiringManagerOnJobPostings JobPosting[]             @relation("HiringManagerOnPosting")
+  managedJobPostings         JobPosting[]             @relation("ManagedJobPostings")
+  interviewersOnJobs         JobPosting[]             @relation("InterviewerOnJobs")
+  subscription               Subscription?
+  apiKeys                    ApiKey[]
+  usageRecords               UsageRecord[]
+  interviewPractices         InterviewPractice[]
+  notificationPrefs          Json?
+  dashboardWidgets           Json?
+  aiUserProfile              AIUserProfile?
+  emailMessages              EmailMessage[]
+  discoveredJobs             DiscoveredJob[]
+  aiUserMemories             AIUserMemory[]
+  followUpActions            FollowUpAction[]
+  recruiterContacts          RecruiterContact[]
+  careerReminders            CareerReminder[]
 }
 
 model Subscription {
-  id              String    @id @default(cuid())
-  userId          String    @unique
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  stripeCustomerId String?
-  stripeSubId     String?
-  plan            PlanType  @default(FREE)
-  status          SubStatus @default(ACTIVE)
-  seats           Int       @default(1)
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId   String?
+  stripeSubId        String?
+  plan               PlanType  @default(FREE)
+  status             SubStatus @default(ACTIVE)
+  seats              Int       @default(1)
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?
-  trialEndsAt     DateTime?
-  cancelAtPeriodEnd Boolean  @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  trialEndsAt        DateTime?
+  cancelAtPeriodEnd  Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }
 
 enum PlanType {
@@ -88,51 +92,51 @@ enum SubStatus {
 }
 
 model ApiKey {
-  id          String     @id @default(cuid())
-  userId      String
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name        String
-  key         String     @unique
-  scopes      String     @default("read")
-  lastUsedAt  DateTime?
-  expiresAt   DateTime?
-  createdAt   DateTime   @default(now())
-  revokedAt   DateTime?
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  key        String    @unique
+  scopes     String    @default("read")
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
 }
 
 model Webhook {
-  id             String   @id @default(cuid())
+  id             String         @id @default(cuid())
   organizationId String?
   url            String
   secret         String
   events         String[]
-  enabled        Boolean  @default(true)
-  createdAt      DateTime @default(now())
+  enabled        Boolean        @default(true)
+  createdAt      DateTime       @default(now())
   webhookEvents  WebhookEvent[]
 }
 
 model WebhookEvent {
-  id             String   @id @default(cuid())
-  webhookId      String
-  webhook        Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
-  event          String
-  payload        Json
-  status         String   @default("pending")
-  responseCode   Int?
-  attempts       Int      @default(0)
-  nextRetryAt    DateTime?
-  deliveredAt    DateTime?
-  createdAt      DateTime @default(now())
+  id           String    @id @default(cuid())
+  webhookId    String
+  webhook      Webhook   @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event        String
+  payload      Json
+  status       String    @default("pending")
+  responseCode Int?
+  attempts     Int       @default(0)
+  nextRetryAt  DateTime?
+  deliveredAt  DateTime?
+  createdAt    DateTime  @default(now())
 }
 
 model UsageRecord {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  feature   String
-  count     Int      @default(1)
-  date      DateTime @default(now())
-  metadata  Json?
+  id       String   @id @default(cuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feature  String
+  count    Int      @default(1)
+  date     DateTime @default(now())
+  metadata Json?
 
   @@index([userId])
 }
@@ -146,15 +150,15 @@ model FeatureFlag {
 }
 
 model OrganizationSetting {
-  id              String   @id @default(cuid())
-  organizationId  String   @unique
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  brandColor      String?
-  logoUrl         String?
-  emailBranding   Json?
-  securityPolicy  Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  brandColor     String?
+  logoUrl        String?
+  emailBranding  Json?
+  securityPolicy Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }
 
 enum OrgMemberRole {
@@ -173,15 +177,15 @@ enum OrgMemberStatus {
 }
 
 model Organization {
-  id          String   @id @default(cuid())
+  id          String                   @id @default(cuid())
   name        String
-  slug        String   @unique
+  slug        String                   @unique
   logo        String?
   website     String?
   industry    String?
   companySize String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
   members     OrganizationMember[]
   invitations OrganizationInvitation[]
   jobPostings JobPosting[]
@@ -190,15 +194,15 @@ model Organization {
 }
 
 model OrganizationMember {
-  id              String   @id @default(cuid())
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role            OrgMemberRole @default(VIEWER)
-  status          OrgMemberStatus @default(ACTIVE)
-  invitedById     String?
-  joinedAt        DateTime @default(now())
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           OrgMemberRole   @default(VIEWER)
+  status         OrgMemberStatus @default(ACTIVE)
+  invitedById    String?
+  joinedAt       DateTime        @default(now())
 
   @@unique([organizationId, userId])
   @@index([organizationId])
@@ -206,17 +210,17 @@ model OrganizationMember {
 }
 
 model OrganizationInvitation {
-  id              String   @id @default(cuid())
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  email           String
-  role            OrgMemberRole @default(VIEWER)
-  token           String   @unique
-  invitedBy       User?    @relation(fields: [invitedById], references: [id], onDelete: SetNull)
-  invitedById     String?
-  expiresAt       DateTime
-  acceptedAt      DateTime?
-  createdAt       DateTime @default(now())
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           OrgMemberRole @default(VIEWER)
+  token          String        @unique
+  invitedBy      User?         @relation(fields: [invitedById], references: [id], onDelete: SetNull)
+  invitedById    String?
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime      @default(now())
 }
 
 enum JobPostingStatus {
@@ -227,9 +231,9 @@ enum JobPostingStatus {
 }
 
 model JobPosting {
-  id              String   @id @default(cuid())
+  id              String           @id @default(cuid())
   organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   title           String
   department      String?
   employmentType  String?
@@ -242,61 +246,61 @@ model JobPosting {
   benefits        String?
   status          JobPostingStatus @default(DRAFT)
   hiringManagerId String?
-  hiringManager   User?    @relation("HiringManagerOnPosting", fields: [hiringManagerId], references: [id], onDelete: SetNull)
+  hiringManager   User?            @relation("HiringManagerOnPosting", fields: [hiringManagerId], references: [id], onDelete: SetNull)
   createdBy       String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   candidates      Candidate[]
-  manager         User?    @relation("ManagedJobPostings", fields: [createdBy], references: [id], onDelete: SetNull)
-  interviewers    User[]   @relation("InterviewerOnJobs")
+  manager         User?            @relation("ManagedJobPostings", fields: [createdBy], references: [id], onDelete: SetNull)
+  interviewers    User[]           @relation("InterviewerOnJobs")
 
   @@index([organizationId])
   @@index([status])
 }
 
 model TeamComment {
-  id              String   @id @default(cuid())
-  candidateId     String
-  candidate       Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  content         String
-  isResolved      Boolean  @default(false)
-  parentId        String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String    @id @default(cuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content     String
+  isResolved  Boolean   @default(false)
+  parentId    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model CandidateScorecard {
-  id              String   @id @default(cuid())
-  candidateId     String
-  candidate       Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  technicalScore  Int?
-  communicationScore Int?
+  id                  String    @id @default(cuid())
+  candidateId         String
+  candidate           Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  technicalScore      Int?
+  communicationScore  Int?
   problemSolvingScore Int?
-  leadershipScore Int?
-  cultureFitScore Int?
-  overallScore    Int?
-  recommendation  String?
-  notes           String?
-  createdAt       DateTime @default(now())
+  leadershipScore     Int?
+  cultureFitScore     Int?
+  overallScore        Int?
+  recommendation      String?
+  notes               String?
+  createdAt           DateTime  @default(now())
 }
 
 model AuditLog {
-  id              String   @id @default(cuid())
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  action          String
-  entity          String
-  entityId        String?
-  oldValue        Json?
-  newValue        Json?
-  ipAddress       String?
-  createdAt       DateTime @default(now())
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action         String
+  entity         String
+  entityId       String?
+  oldValue       Json?
+  newValue       Json?
+  ipAddress      String?
+  createdAt      DateTime     @default(now())
 
   @@index([organizationId])
   @@index([userId])
@@ -315,117 +319,126 @@ enum ResumeSectionType {
 }
 
 model Resume {
-  id         String           @id @default(cuid())
-  userId     String
-  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name       String
-  title      String           @default("")
-  summary    String           @default("")
-  isDefault  Boolean          @default(false)
-  atsScore   Int              @default(0)
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
-  sections   ResumeSection[]
-  versions   ResumeVersion[]
-  coverLetters CoverLetter[]
+  id               String          @id @default(cuid())
+  userId           String
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String
+  title            String          @default("")
+  summary          String          @default("")
+  isDefault        Boolean         @default(false)
+  atsScore         Int             @default(0)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  sections         ResumeSection[]
+  versions         ResumeVersion[]
+  coverLetters     CoverLetter[]
+  jobApplicationId String?
+  jobApplication   JobApplication? @relation(fields: [jobApplicationId], references: [id], onDelete: SetNull)
 
   @@index([userId])
 }
 
 model ResumeSection {
-  id         String            @id @default(cuid())
-  resumeId   String
-  resume     Resume            @relation(fields: [resumeId], references: [id], onDelete: Cascade)
-  type       ResumeSectionType
-  title      String
-  order      Int               @default(0)
-  content    Json
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  id        String            @id @default(cuid())
+  resumeId  String
+  resume    Resume            @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  type      ResumeSectionType
+  title     String
+  order     Int               @default(0)
+  content   Json
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 }
 
 model ResumeVersion {
-  id             String   @id @default(cuid())
-  resumeId       String
-  resume         Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
-  versionNumber  Int
-  notes          String?
-  snapshot       Json
-  createdAt      DateTime @default(now())
+  id            String   @id @default(cuid())
+  resumeId      String
+  resume        Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  notes         String?
+  snapshot      Json
+  createdAt     DateTime @default(now())
 }
 
 model CoverLetter {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  resumeId   String?
-  resume     Resume?  @relation(fields: [resumeId], references: [id], onDelete: SetNull)
-  company    String
-  position   String
-  content    String
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resumeId  String?
+  resume    Resume?  @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  company   String
+  position  String
+  content   String
+  createdAt DateTime @default(now())
 
   @@index([userId])
 }
 
 model Conversation {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title        String
-  roleContext  String
-  pinned       Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  messages     ConversationMessage[]
+  id          String                @id @default(cuid())
+  userId      String
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  roleContext String
+  pinned      Boolean               @default(false)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  messages    ConversationMessage[]
 
   @@index([userId])
 }
 
 model ConversationMessage {
-  id              String   @id @default(cuid())
-  conversationId  String
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  role            String
-  content         String
-  metadata        Json?
-  createdAt       DateTime @default(now())
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String
+  content        String
+  metadata       Json?
+  createdAt      DateTime     @default(now())
 }
 
 model GmailToken {
-  id           String   @id @default(cuid())
-  userId       String   @unique
+  id           String    @id @default(cuid())
+  userId       String    @unique
   accessToken  String
   refreshToken String
   expiryDate   DateTime
   lastSyncedAt DateTime?
   historyId    String?
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum Status {
+  SAVED
   UNAPPLIED
   WISHLIST
   APPLIED
+  UNDER_REVIEW
+  ASSESSMENT
   INTERVIEW
+  FINAL_INTERVIEW
   OFFER
+  ACCEPTED
   REJECTED
+  WITHDRAWN
+  ARCHIVED
 }
 
 model JobApplication {
-  id                  String   @id @default(cuid())
+  id                  String              @id @default(cuid())
   userId              String
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   company             String
   role                String
   link                String?
   notes               String?
-  status              Status   @default(UNAPPLIED)
+  status              Status              @default(UNAPPLIED)
   source              String?
   sourceEmailId       String?
-  position            Int      @default(0)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  position            Int                 @default(0)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
   contactName         String?
   contactEmail        String?
   contactPhone        String?
@@ -435,48 +448,53 @@ model JobApplication {
   otherDocuments      Json?
   reminders           Reminder[]
   activities          ActivityLog[]
+  resumes             Resume[]
+  interviews          Interview[]
+  practices           InterviewPractice[]
+  emailMessages       EmailMessage[]
+  followUpActions     FollowUpAction[]
 
   @@index([userId])
   @@index([status])
 }
 
 model Reminder {
-  id            String   @id @default(cuid())
+  id            String         @id @default(cuid())
   applicationId String
   application   JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   title         String
   dueDate       DateTime
-  isCompleted   Boolean  @default(false)
-  createdAt     DateTime @default(now())
+  isCompleted   Boolean        @default(false)
+  createdAt     DateTime       @default(now())
 
   @@index([userId])
   @@index([applicationId])
 }
 
 model ActivityLog {
-  id            String   @id @default(cuid())
+  id            String          @id @default(cuid())
   applicationId String?
   application   JobApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
   userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   action        String
   detail        String?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime        @default(now())
 
   @@index([userId])
 }
 
 model Candidate {
-  id                String   @id @default(cuid())
+  id                String               @id @default(cuid())
   employerId        String
-  employer          User     @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  employer          User                 @relation(fields: [employerId], references: [id], onDelete: Cascade)
   name              String
   email             String
   phone             String?
   positionApplied   String
-  status            CandidateStatus @default(NEW)
+  status            CandidateStatus      @default(NEW)
   resumeText        String?
   coverLetter       String?
   keySkills         String[]
@@ -486,17 +504,17 @@ model Candidate {
   rating            Int?
   tags              String[]
   notes             String?
-  position          Int      @default(0)
-  appliedAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  position          Int                  @default(0)
+  appliedAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
   activities        CandidateActivity[]
   replies           AiReply[]
   jobPostingId      String?
-  jobPosting        JobPosting? @relation(fields: [jobPostingId], references: [id], onDelete: SetNull)
+  jobPosting        JobPosting?          @relation(fields: [jobPostingId], references: [id], onDelete: SetNull)
   recruiterId       String?
-  recruiter         User?    @relation("AssignedToRecruiter", fields: [recruiterId], references: [id], onDelete: SetNull)
+  recruiter         User?                @relation("AssignedToRecruiter", fields: [recruiterId], references: [id], onDelete: SetNull)
   hiringManagerId   String?
-  hiringManager     User?    @relation("HiringManager", fields: [hiringManagerId], references: [id], onDelete: SetNull)
+  hiringManager     User?                @relation("HiringManager", fields: [hiringManagerId], references: [id], onDelete: SetNull)
   teamComments      TeamComment[]
   scorecards        CandidateScorecard[]
 
@@ -527,13 +545,13 @@ model EmailTemplate {
 }
 
 model AiReply {
-  id          String   @id @default(cuid())
+  id          String      @id @default(cuid())
   candidateId String
-  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  candidate   Candidate   @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   body        String
   sentAt      DateTime?
   status      ReplyStatus @default(DRAFT)
-  createdAt   DateTime @default(now())
+  createdAt   DateTime    @default(now())
 }
 
 enum ReplyStatus {
@@ -543,12 +561,12 @@ enum ReplyStatus {
 }
 
 model CandidateActivity {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   candidateId String
   candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   action      String
   detail      String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 }
 
 model CalendarConnection {
@@ -563,9 +581,9 @@ model CalendarConnection {
 }
 
 model SavedJob {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   userId           String
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   externalId       String
   source           String
   title            String
@@ -582,9 +600,9 @@ model SavedJob {
   companyWebsite   String?
   applicationUrl   String?
   postedAt         DateTime?
-  importedToKanban Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  importedToKanban Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@unique([userId, externalId, source])
   @@index([userId])
@@ -613,96 +631,112 @@ enum InterviewStatus {
 }
 
 model Interview {
-  id                String            @id @default(cuid())
-  userId            String
-  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  applicationId     String?
-  company           String
-  position          String
-  interviewType     InterviewType     @default(TECHNICAL)
-  interviewRound    Int               @default(1)
-  scheduledAt       DateTime?
-  duration          Int?
-  location          String?
-  meetingLink       String?
-  interviewerName   String?
-  interviewerEmail  String?
-  timezone          String?
-  status            InterviewStatus   @default(SCHEDULED)
-  notes             String?
-  calendarEventId   String?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  practices         InterviewPractice[]
-  questions         InterviewNote[]
+  id               String              @id @default(cuid())
+  userId           String
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationId    String?
+  jobApplication   JobApplication?     @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  company          String
+  position         String
+  interviewType    InterviewType       @default(TECHNICAL)
+  interviewRound   Int                 @default(1)
+  scheduledAt      DateTime?
+  duration         Int?
+  location         String?
+  meetingLink      String?
+  interviewerName  String?
+  interviewerEmail String?
+  timezone         String?
+  status           InterviewStatus     @default(SCHEDULED)
+  notes            String?
+  calendarEventId  String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  practices        InterviewPractice[]
+  questions        InterviewNote[]
 
   @@index([userId])
 }
 
 model InterviewPractice {
-  id            String   @id @default(cuid())
-  interviewId   String?
-  interview     Interview? @relation(fields: [interviewId], references: [id], onDelete: SetNull)
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  company       String?
-  role          String?
-  category      String
-  difficulty    String
-  question      String
-  userAnswer    String?
-  aiFeedback    Json?
-  score         Int?
-  createdAt     DateTime @default(now())
+  id               String          @id @default(cuid())
+  interviewId      String?
+  interview        Interview?      @relation(fields: [interviewId], references: [id], onDelete: SetNull)
+  jobApplicationId String?
+  jobApplication   JobApplication? @relation(fields: [jobApplicationId], references: [id], onDelete: SetNull)
+  userId           String
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company          String?
+  role             String?
+  category         String
+  difficulty       String
+  question         String
+  userAnswer       String?
+  aiFeedback       Json?
+  score            Int?
+  createdAt        DateTime        @default(now())
 }
 
 model InterviewQuestion {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  company      String?
-  role         String?
-  category     String
-  difficulty   String
-  question     String
-  answerGuide  String?
-  tags         String[]
-  createdAt    DateTime @default(now())
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company     String?
+  role        String?
+  category    String
+  difficulty  String
+  question    String
+  answerGuide String?
+  tags        String[]
+  createdAt   DateTime @default(now())
 }
 
 model InterviewNote {
-  id            String   @id @default(cuid())
-  interviewId   String
-  interview     Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
-  type          String
-  title         String
-  content       String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String    @id @default(cuid())
+  interviewId String
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  type        String
+  title       String
+  content     String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
-model CareerProfile {
-  id           String   @id @default(cuid())
-  userId       String   @unique
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fullName     String?
-  headline     String?
-  summary      String?
-  skills       String[]
-  experience   Json?
-  education    Json?
-  preferences  Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+model AIUserProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  summary            String?
+  careerGoals        Json?    // Array of goals
+  preferredRoles     String[]
+  preferredLocations String[]
+  preferredWorkModes String[] // e.g., remote, hybrid, on-site
+  skills             String[]
+  technicalSkills    String[]
+  softSkills         String[]
+  education          Json?
+  certifications     Json?
+  experience         Json?
+  projects           Json?
+  achievements       String[]
+  languages          String[]
+  salaryExpectation  String?
+  industries         String[]
+  preferredCompanies String[]
+  yearsOfExperience  Int?
+  strengths          String[]
+  weaknesses         String[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   @@index([userId])
 }
 
 model EmailMessage {
-  id                 String   @id @default(cuid())
+  id                 String          @id @default(cuid())
   userId             String
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  gmailMessageId     String   @unique
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gmailMessageId     String          @unique
   gmailThreadId      String?
   sender             String?
   senderEmail        String?
@@ -710,18 +744,24 @@ model EmailMessage {
   subject            String?
   snippet            String?
   receivedAt         DateTime?
-  isRead             Boolean  @default(false)
-  isStarred          Boolean  @default(false)
+  isRead             Boolean         @default(false)
+  isStarred          Boolean         @default(false)
   labels             String[]
   category           String?
   confidence         Float?
-  jobRelated         Boolean  @default(false)
-  applicationRelated Boolean  @default(false)
-  interviewRelated   Boolean  @default(false)
-  rejectionRelated   Boolean  @default(false)
-  offerRelated       Boolean  @default(false)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  jobApplicationId   String?
+  jobApplication     JobApplication? @relation(fields: [jobApplicationId], references: [id], onDelete: SetNull)
+  jobRelated         Boolean         @default(false)
+  applicationRelated Boolean         @default(false)
+  interviewRelated   Boolean         @default(false)
+  rejectionRelated   Boolean         @default(false)
+  offerRelated       Boolean         @default(false)
+  urgency            Float?          @default(0)
+  importance         Float?          @default(0)
+  action             String?
+  replyDraft         String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
   discoveredJobs     DiscoveredJob[]
 
   @@index([userId])
@@ -729,22 +769,103 @@ model EmailMessage {
 }
 
 model DiscoveredJob {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceEmailId  String?
+  sourceEmail    EmailMessage? @relation(fields: [sourceEmailId], references: [id], onDelete: SetNull)
+  title          String
+  company        String
+  location       String?
+  employmentType String?
+  remoteType     String?
+  salaryMin      Int?
+  salaryMax      Int?
+  salaryCurrency String?
+  status         String        @default("NEW")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([sourceEmailId])
+}
+
+model AIUserMemory {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category       String
+  key            String
+  value          String
+  source         String
+  confidence     Float     @default(0.5)
+  isConfirmed    Boolean   @default(false)
+  lastVerifiedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([category])
+}
+
+enum FollowUpStatus {
+  PENDING
+  COMPLETED
+  DISMISSED
+}
+
+model FollowUpAction {
+  id               String          @id @default(cuid())
+  userId           String
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobApplicationId String?
+  jobApplication   JobApplication? @relation(fields: [jobApplicationId], references: [id], onDelete: Cascade)
+  title            String
+  description      String?
+  dueDate          DateTime
+  status           FollowUpStatus  @default(PENDING)
+  actionType       String          @default("EMAIL")
+  sourceEmailId    String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([jobApplicationId])
+  @@index([status])
+}
+
+model RecruiterContact {
   id                 String   @id @default(cuid())
   userId             String
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sourceEmailId      String?
-  sourceEmail        EmailMessage? @relation(fields: [sourceEmailId], references: [id], onDelete: SetNull)
-  title              String
-  company            String
-  location           String?
-  employmentType     String?
-  remoteType         String?
-  salaryMin          Int?
-  salaryMax          Int?
-  salaryCurrency     String?
-  status             String   @default("NEW")
+  name               String
+  email              String?
+  company            String?
+  role               String?
+  linkedInUrl        String?
+  relationship       String?  // RECRUITER, HIRING_MANAGER, etc.
+  lastContactedAt    DateTime?
+  communicationCount Int      @default(0)
+  sourceEmailIds     String[] // Array of email IDs to trace
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model CareerReminder {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           String        // ASSESSMENT_DEADLINE, INTERVIEW_DATE, etc.
+  date           DateTime
+  confidence     Float         @default(1.0)
+  sourceEmailId  String?
+  isCompleted    Boolean       @default(false)
+  title          String?
+  description    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@index([userId])
   @@index([sourceEmailId])
