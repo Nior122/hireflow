@@ -4,23 +4,24 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Sparkles, ClipboardCheck } from "lucide-react";
+import { Sparkles, ClipboardCheck, Mail, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { seedSampleData } from "@/actions/seed";
 import { AddApplicationDialog } from "./AddApplicationDialog";
+import { syncGmailInbox } from "@/actions/gmail-sync";
+import Link from "next/link";
 
 export function EmptyState() {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [isSyncing, startSync] = useTransition();
 
-  function handleSeed() {
-    startTransition(async () => {
-      const result = await seedSampleData();
+  function handleScanGmail() {
+    startSync(async () => {
+      const result = await syncGmailInbox();
       if (result.success) {
-        toast.success("Sample data loaded! Explore your board.");
+        toast.success(`Inbox scanned! Found ${result.data?.jobsDiscovered ?? 0} jobs.`);
         router.refresh();
       } else {
-        toast.error(result.error ?? "Failed to load sample data");
+        toast.error(result.error ?? "Failed to scan Gmail. Please check your connection in Settings.");
       }
     });
   }
@@ -36,17 +37,23 @@ export function EmptyState() {
         </motion.div>
       </motion.div>
 
-      <motion.h2 initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }} className="text-2xl font-bold tracking-tight mb-3">Your job hunt starts here</motion.h2>
+      <motion.h2 initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }} className="text-2xl font-bold tracking-tight mb-3">No applications yet</motion.h2>
       <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }} className="text-muted-foreground text-center max-w-md mb-10 leading-relaxed">
-        Track every application from wishlist to offer. Load our sample data to see the board in action.
+        Let&apos;s build your AI career pipeline. Connect your inbox or add your first job manually.
       </motion.p>
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }} className="flex flex-col sm:flex-row items-center gap-3">
-        <AddApplicationDialog />
-        <Button size="lg" variant="outline" className="gap-2" onClick={handleSeed} disabled={isPending}>
-          <Sparkles className="h-4 w-4" />
-          {isPending ? "Loading..." : "Load Sample Jobs"}
+        <Button size="lg" className="gap-2" onClick={handleScanGmail} disabled={isSyncing}>
+          <Mail className="h-4 w-4" />
+          {isSyncing ? "Scanning..." : "Scan Gmail for Jobs"}
         </Button>
+        <AddApplicationDialog />
+        <Link href="/dashboard/discover">
+          <Button size="lg" variant="outline" className="gap-2">
+            <Search className="h-4 w-4" />
+            Discover Jobs
+          </Button>
+        </Link>
       </motion.div>
     </motion.div>
   );
