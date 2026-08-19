@@ -170,10 +170,20 @@ export function SettingsDashboard() {
                 
                 <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
                   {!loading && gmailStatus?.connected ? (
-                    <Button variant="outline" className="w-full sm:w-auto shadow-sm gap-2" onClick={handleSync} disabled={isSyncing}>
-                      <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                      {isSyncing ? 'Syncing...' : 'Sync Now'}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="shadow-sm gap-2" onClick={handleSync} disabled={isSyncing}>
+                        <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                        {isSyncing ? 'Syncing...' : 'Sync Now'}
+                      </Button>
+                      <Button 
+                        variant="secondary"
+                        className="shadow-sm gap-2" 
+                        onClick={() => { window.location.href = "/api/auth/gmail/connect"; }}
+                        title="Start sync afresh and choose a new Gmail account"
+                      >
+                        <Mail className="w-4 h-4" /> Reconnect
+                      </Button>
+                    </div>
                   ) : (
                     <Button 
                       className="w-full sm:w-auto shadow-sm gap-2" 

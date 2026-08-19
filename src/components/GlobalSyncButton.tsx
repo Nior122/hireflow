@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { toast } from "sonner";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { syncGmailInbox } from "@/actions/gmail-sync";
 import { useRouter } from "next/navigation";
@@ -28,9 +28,20 @@ export function GlobalSyncButton() {
   }
 
   return (
-    <Button variant="outline" size="sm" className="gap-2" onClick={handleSync} disabled={isSyncing}>
-      <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-      {isSyncing ? "Syncing..." : "Sync Gmail"}
-    </Button>
+    <div className="flex items-center gap-2">
+      <Button variant="outline" size="sm" className="gap-2" onClick={handleSync} disabled={isSyncing}>
+        <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+        {isSyncing ? "Syncing..." : "Sync Gmail"}
+      </Button>
+      <Button 
+        variant="secondary" 
+        size="sm" 
+        className="gap-2" 
+        onClick={() => { window.location.href = "/api/auth/gmail/connect"; }} 
+        title="Start sync afresh and choose a new Gmail account"
+      >
+        <Mail className="h-4 w-4" /> Reconnect
+      </Button>
+    </div>
   );
 }

@@ -274,6 +274,9 @@ export function EmailDigestPanel() {
                 {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                 {syncing ? "Syncing..." : "Sync Inbox"}
               </Button>
+              <Button onClick={() => { window.location.href = "/api/auth/gmail/connect"; }} size="sm" variant="secondary" className="gap-2" title="Choose a new Gmail account or start afresh">
+                <Mail className="h-4 w-4" /> Reconnect
+              </Button>
               <Button variant="ghost" size="icon-xs" onClick={handleDisconnect} title="Disconnect Gmail">
                 <Unplug className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
               </Button>

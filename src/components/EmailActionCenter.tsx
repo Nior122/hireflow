@@ -190,16 +190,19 @@ export function EmailActionCenter() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
               {!connected ? (
-                <Link href="/dashboard/settings">
-                  <Button size="sm" variant="outline" className="gap-2">
-                    <Settings className="h-4 w-4" /> Connect Gmail in Settings
-                  </Button>
-                </Link>
-              ) : (
-                <Button size="sm" variant="outline" className="gap-2" onClick={handleSync} disabled={isSyncing}>
-                  <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                  {isSyncing ? 'Syncing...' : 'Sync Now'}
+                <Button size="sm" variant="outline" className="gap-2" onClick={() => { window.location.href = "/api/auth/gmail/connect"; }}>
+                  <Settings className="h-4 w-4" /> Connect Gmail
                 </Button>
+              ) : (
+                <>
+                  <Button size="sm" variant="outline" className="gap-2" onClick={handleSync} disabled={isSyncing}>
+                    <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                    {isSyncing ? 'Syncing...' : 'Sync Now'}
+                  </Button>
+                  <Button size="sm" variant="secondary" className="gap-2" onClick={() => { window.location.href = "/api/auth/gmail/connect"; }} title="Choose a new Gmail account or start afresh">
+                    <Mail className="h-4 w-4" /> Reconnect
+                  </Button>
+                </>
               )}
             </div>
           </div>
