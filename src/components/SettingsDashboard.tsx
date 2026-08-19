@@ -175,10 +175,11 @@ export function SettingsDashboard() {
                       {isSyncing ? 'Syncing...' : 'Sync Now'}
                     </Button>
                   ) : (
-                    <Button className="w-full sm:w-auto shadow-sm gap-2" asChild>
-                      <a href="/api/auth/gmail/connect">
-                        <Mail className="w-4 h-4" /> Connect Gmail
-                      </a>
+                    <Button 
+                      className="w-full sm:w-auto shadow-sm gap-2" 
+                      onClick={() => { window.location.href = "/api/auth/gmail/connect"; }}
+                    >
+                      <Mail className="w-4 h-4" /> Connect Gmail
                     </Button>
                   )}
                   
