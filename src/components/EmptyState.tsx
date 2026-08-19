@@ -16,12 +16,17 @@ export function EmptyState() {
 
   function handleScanGmail() {
     startSync(async () => {
-      const result = await syncGmailInbox();
-      if (result.success) {
-        toast.success(`Inbox scanned! Found ${result.data?.jobsDiscovered ?? 0} jobs.`);
-        router.refresh();
-      } else {
-        toast.error(result.error ?? "Failed to scan Gmail. Please check your connection in Settings.");
+      try {
+        const result = await syncGmailInbox();
+        if (result.success) {
+          toast.success(`Inbox scanned! Found ${result.data?.jobsDiscovered ?? 0} jobs.`);
+          router.refresh();
+        } else {
+          toast.error(result.error ?? "Failed to scan Gmail. Please check your connection in Settings.");
+        }
+      } catch (error) {
+        console.error("Gmail sync failed:", error);
+        toast.error("Network or server error while scanning Gmail. Please try again.");
       }
     });
   }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { 
   User, 
   Link as LinkIcon, 
@@ -18,7 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getGmailSyncStatus } from "@/actions/gmail-sync";
+import { getGmailSyncStatus, syncGmailInbox } from "@/actions/gmail-sync";
 import { LinkedInImport } from "./LinkedInImport";
 import { toast } from "sonner";
 
@@ -31,6 +31,7 @@ export function SettingsDashboard() {
   } | null>(null);
   
   const [loading, setLoading] = useState(true);
+  const [isSyncing, startSync] = useTransition();
 
   useEffect(() => {
     async function loadGmailStatus() {
@@ -42,6 +43,24 @@ export function SettingsDashboard() {
     }
     loadGmailStatus();
   }, []);
+
+  const handleSync = () => {
+    startSync(async () => {
+      try {
+        const result = await syncGmailInbox();
+        if (result.success) {
+          toast.success(`Synced! Processed ${result.data?.emailsProcessed ?? 0} emails, found ${result.data?.jobsDiscovered ?? 0} jobs.`);
+          // Refresh Gmail status
+          const res = await getGmailSyncStatus();
+          if (res.success && res.data) setGmailStatus(res.data);
+        } else {
+          toast.error(result.error ?? "Failed to sync Gmail.");
+        }
+      } catch (err) {
+        toast.error("Network error while syncing Gmail. Please try again.");
+      }
+    });
+  };
 
   const handleLinkedInImport = (company: string, role: string) => {
     toast.success(`Imported: ${role} at ${company}`);
@@ -151,9 +170,16 @@ export function SettingsDashboard() {
                 
                 <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
                   {!loading && gmailStatus?.connected ? (
-                    <Button variant="outline" className="w-full sm:w-auto shadow-sm">Manage Sync</Button>
+                    <Button variant="outline" className="w-full sm:w-auto shadow-sm gap-2" onClick={handleSync} disabled={isSyncing}>
+                      <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                      {isSyncing ? 'Syncing...' : 'Sync Now'}
+                    </Button>
                   ) : (
-                    <Button className="w-full sm:w-auto shadow-sm">Connect Gmail</Button>
+                    <Button className="w-full sm:w-auto shadow-sm gap-2" asChild>
+                      <a href="/api/auth/gmail/connect">
+                        <Mail className="w-4 h-4" /> Connect Gmail
+                      </a>
+                    </Button>
                   )}
                   
                   {!loading && gmailStatus?.connected && (

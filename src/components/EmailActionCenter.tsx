@@ -1,15 +1,19 @@
 'use client';
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
   Inbox, Loader2, Briefcase, CalendarCheck, UserCheck,
   XCircle, Gift, Mail, AlertTriangle, Clock, ArrowRight,
-  CheckCircle2, Star, Award, FileCheck,
+  CheckCircle2, Star, Award, FileCheck, RefreshCw, Settings,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { getInboxEmails, getGmailSyncStatus } from "@/actions/gmail-sync";
+import { Button } from "@/components/ui/button";
+import { getInboxEmails, getGmailSyncStatus, syncGmailInbox } from "@/actions/gmail-sync";
 import { formatDistanceToNow } from "date-fns";
 
 interface ActionEmail {
@@ -61,6 +65,25 @@ export function EmailActionCenter() {
   const [emails, setEmails] = useState<ActionEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
+  const [isSyncing, startSync] = useTransition();
+  const router = useRouter();
+
+  const handleSync = () => {
+    startSync(async () => {
+      try {
+        const result = await syncGmailInbox();
+        if (result.success) {
+          toast.success(`Synced successfully! Processed ${result.data?.emailsProcessed ?? 0} emails.`);
+          loadData();
+        } else {
+          toast.error(result.error ?? "Failed to sync Gmail.");
+        }
+      } catch (error) {
+        console.error("Gmail sync failed:", error);
+        toast.error("Network or server error while scanning Gmail.");
+      }
+    });
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -158,13 +181,27 @@ export function EmailActionCenter() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 space-y-2">
+          <div className="text-center py-8 space-y-4">
             <Inbox className="h-10 w-10 mx-auto text-muted-foreground/30" />
             <p className="text-sm text-muted-foreground">
               {!connected
-                ? "Connect Gmail and sync your inbox to see career activity here."
+                ? "Connect Gmail to start seeing career activity here."
                 : "No actionable items yet. Sync your inbox to discover career opportunities."}
             </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+              {!connected ? (
+                <Link href="/dashboard/settings">
+                  <Button size="sm" variant="outline" className="gap-2">
+                    <Settings className="h-4 w-4" /> Connect Gmail in Settings
+                  </Button>
+                </Link>
+              ) : (
+                <Button size="sm" variant="outline" className="gap-2" onClick={handleSync} disabled={isSyncing}>
+                  <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                  {isSyncing ? 'Syncing...' : 'Sync Now'}
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -173,13 +210,16 @@ export function EmailActionCenter() {
 
   return (
     <Card>
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base flex items-center gap-2">
           <Inbox className="h-5 w-5" /> Action Center
-          <Badge variant="outline" className="ml-auto text-[10px]">
+          <Badge variant="outline" className="text-[10px]">
             {emails.length} items
           </Badge>
         </CardTitle>
+        <Button size="icon-xs" variant="ghost" onClick={handleSync} disabled={isSyncing} title="Sync Gmail">
+          <RefreshCw className={`h-4 w-4 text-muted-foreground ${isSyncing ? 'animate-spin text-primary' : 'hover:text-primary'}`} />
+        </Button>
       </CardHeader>
       <CardContent className="space-y-4">
         {nonEmptyGroups.map((group, gi) => (

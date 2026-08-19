@@ -9,6 +9,7 @@ import { EmptyState } from "./EmptyState";
 import { SearchFilterBar } from "./SearchFilterBar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { GlobalSyncButton } from "./GlobalSyncButton";
 import { getApplications } from "@/actions/applications";
 import type { ApplicationCard, ApplicationStatus } from "@/lib/types";
 
@@ -82,7 +83,8 @@ export function JobSeekerDashboard({ userId, widgets }: Props) {
   if (apps.length === 0) {
     return (
       <div className="space-y-4">
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <GlobalSyncButton />
           <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowDigest(!showDigest)}>
             <Inbox className="h-4 w-4" /> Email Digest
           </Button>
@@ -103,9 +105,12 @@ export function JobSeekerDashboard({ userId, widgets }: Props) {
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
       <div className="flex items-center justify-between mb-4">
         <div />
-        <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowDigest(!showDigest)}>
-          <Inbox className="h-4 w-4" /> Email Digest
-        </Button>
+        <div className="flex gap-2">
+          <GlobalSyncButton />
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowDigest(!showDigest)}>
+            <Inbox className="h-4 w-4" /> Email Digest
+          </Button>
+        </div>
       </div>
       {showDigest && (
         <div className="mb-6 p-4 rounded-xl border bg-card">
