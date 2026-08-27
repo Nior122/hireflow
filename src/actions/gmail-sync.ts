@@ -271,28 +271,40 @@ Respond ONLY with a JSON object matching this schema (no markdown, no extra text
   }
 }
 
+function safeBase64UrlDecode(str: string): string {
+  if (!str) return "";
+  try {
+    let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
+    while (base64.length % 4) {
+      base64 += "=";
+    }
+    return Buffer.from(base64, "base64").toString("utf-8");
+  } catch {
+    return "";
+  }
+}
+
 // Extract body text recursively from Gmail payload parts
 function extractEmailBody(payload: any): string {
   if (!payload) return "";
   let body = "";
 
   if (payload.body?.data) {
-    body += Buffer.from(payload.body.data, "base64url").toString("utf-8") + "\n";
+    body += safeBase64UrlDecode(payload.body.data) + "\n";
   }
 
   if (payload.parts) {
     for (const part of payload.parts) {
-      if (part.mimeType === "text/plain" || part.mimeType === "text/html") {
-        if (part.body?.data) {
-          body += Buffer.from(part.body.data, "base64url").toString("utf-8") + "\n";
-        }
-      } else if (part.parts) {
+      if (part.body?.data) {
+        body += safeBase64UrlDecode(part.body.data) + "\n";
+      }
+      if (part.parts) {
         body += extractEmailBody(part) + "\n";
       }
     }
   }
 
-  // Strip simple HTML tags for AI context
+  // Strip HTML tags for clean AI context
   return body.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
              .replace(/<[^>]*>?/gm, ' ')
@@ -316,9 +328,9 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
       return { success: false, error: "Gmail not connected. Please connect Gmail in Settings first." };
     }
 
-    // Fetch latest 100 messages to get a useful batch of real emails
+    // Fetch latest 100 messages across the user's inbox
     const listRes = await fetch(
-      "https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=100&q=newer_than:60d",
+      "https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=100",
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
 
