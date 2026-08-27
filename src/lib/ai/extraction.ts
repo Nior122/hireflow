@@ -17,27 +17,6 @@ export const JobExtractionSchema = z.object({
 
 export type JobExtraction = z.infer<typeof JobExtractionSchema>;
 
-export async function extractJobDetails(subject: string, snippet: string): Promise<JobExtraction | null> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return null;
-
-  const prompt = `Extract structured job details from this email. Only output JSON matching the schema. No markdown, no text.
-Email Subject: ${subject}
-Email Snippet: ${snippet}
-
-{
-  "company": "string or null",
-  "title": "job title or null",
-  "location": "string or null",
-  "employmentType": "FULL_TIME, PART_TIME, CONTRACT, INTERNSHIP, or null",
-  "remoteType": "REMOTE, HYBRID, ONSITE, or null",
-  "salaryMin": number or null,
-  "salaryMax": number or null,
-  "salaryCurrency": "USD, EUR, etc. or null",
-  "requirements": "brief string or null",
-  "applicationUrl": "url string or null"
-}`;
-
 function parseJsonFromLlm(raw: string): any {
   let cleaned = raw.trim();
   if (cleaned.startsWith("```")) {
