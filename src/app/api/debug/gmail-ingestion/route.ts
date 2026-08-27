@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { createOrGetUser } from "@/actions/users";
-import { getValidGmailToken } from "@/actions/gmail";
+import { createOrGetUser } from "@/lib/clerk";
+import { getValidGmailToken } from "@/actions/gmail-sync";
 import { prisma } from "@/lib/prisma";
 import { GroqProvider } from "@/lib/ai/providers";
-import { EmailClassificationSchema } from "@/lib/ai/schemas";
+import { EmailClassificationSchema } from "@/lib/ai";
 
 function safeBase64UrlDecode(str: string): string {
   if (!str) return "";
@@ -147,7 +147,7 @@ function deterministicClassify(text: string): any {
 }
 
 export async function GET(req: Request) {
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {

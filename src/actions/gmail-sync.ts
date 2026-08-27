@@ -82,7 +82,7 @@ interface InboxEmailRecord {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-async function getValidGmailToken(userId: string): Promise<string | null> {
+export async function getValidGmailToken(userId: string): Promise<string | null> {
   const token = await prisma.gmailToken.findUnique({ where: { userId } });
   if (!token) return null;
 
