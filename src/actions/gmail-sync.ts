@@ -323,25 +323,74 @@ function parseEmailAddress(raw: string): { name: string; email: string } {
 export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>> {
   try {
     const user = await createOrGetUser();
+    const tokenRecord = await prisma.gmailToken.findUnique({ where: { userId: user.id } });
     const accessToken = await getValidGmailToken(user.id);
-    if (!accessToken) {
+    
+    if (!accessToken || !tokenRecord) {
       return { success: false, error: "Gmail not connected. Please connect Gmail in Settings first." };
     }
 
-    // Fetch latest 100 messages across the user's inbox
-    const listRes = await fetch(
-      "https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=100",
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
+    let messageList: { id: string }[] = [];
+    let newHistoryId: string | null = null;
+    let incrementalSyncSuccess = false;
 
-    if (!listRes.ok) {
-      const err = await listRes.json().catch(() => ({}));
-      console.error("[gmail-sync] list failed:", listRes.status, err);
-      return { success: false, error: "Failed to fetch Gmail messages. Please reconnect Gmail." };
+    if (tokenRecord.historyId) {
+      // Try incremental sync
+      const histRes = await fetch(
+        `https://www.googleapis.com/gmail/v1/users/me/history?startHistoryId=${tokenRecord.historyId}&historyTypes=messageAdded`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+
+      if (histRes.ok) {
+        incrementalSyncSuccess = true;
+        const histData = await histRes.json();
+        newHistoryId = histData.historyId || null;
+        
+        const historyRecords = histData.history || [];
+        for (const record of historyRecords) {
+          if (record.messagesAdded) {
+            for (const item of record.messagesAdded) {
+              if (item.message && item.message.id) {
+                messageList.push({ id: item.message.id });
+              }
+            }
+          }
+        }
+      } else {
+        console.log("[gmail-sync] historyId expired or invalid, falling back to full list.");
+      }
     }
 
-    const listData = await listRes.json();
-    const messageList: { id: string }[] = listData.messages ?? [];
+    if (!incrementalSyncSuccess) {
+      // Fallback: Full sync of recent 100 messages
+      const listRes = await fetch(
+        "https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=100",
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+
+      if (!listRes.ok) {
+        const err = await listRes.json().catch(() => ({}));
+        console.error("[gmail-sync] list failed:", listRes.status, err);
+        return { success: false, error: "Failed to fetch Gmail messages. Please reconnect Gmail." };
+      }
+
+      const listData = await listRes.json();
+      messageList = listData.messages ?? [];
+      
+      // We can grab the current profile historyId to use for next time
+      const profileRes = await fetch(
+        "https://www.googleapis.com/gmail/v1/users/me/profile",
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (profileRes.ok) {
+        const profileData = await profileRes.json();
+        newHistoryId = profileData.historyId || null;
+      }
+    }
+
+    // Deduplicate message list IDs
+    const uniqueIds = Array.from(new Set(messageList.map(m => m.id)));
+    messageList = uniqueIds.map(id => ({ id }));
 
     let emailsProcessed = 0;
     let jobsDiscovered = 0;
@@ -694,10 +743,13 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
       }
     }
 
-    // Update sync timestamp
+    // Update sync timestamp and historyId
     await prisma.gmailToken.updateMany({
       where: { userId: user.id },
-      data: { lastSyncedAt: new Date() },
+      data: {
+        lastSyncedAt: new Date(),
+        ...(newHistoryId ? { historyId: newHistoryId } : {}),
+      },
     });
 
     // ─── Memory Extraction ────────────────────────────────────────────────────
