@@ -40,15 +40,15 @@ interface UrgencyGroup {
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   JOB_OPPORTUNITY: <Briefcase className="h-3 w-3" />,
-  APPLICATION_CONFIRMATION: <CheckCircle2 className="h-3 w-3" />,
-  APPLICATION_UPDATE: <FileCheck className="h-3 w-3" />,
-  RECRUITER_CONTACT: <UserCheck className="h-3 w-3" />,
-  INTERVIEW_INVITATION: <CalendarCheck className="h-3 w-3" />,
-  INTERVIEW_REMINDER: <Clock className="h-3 w-3" />,
-  REJECTION: <XCircle className="h-3 w-3" />,
-  OFFER: <Gift className="h-3 w-3" />,
-  ASSESSMENT: <Award className="h-3 w-3" />,
-  CAREER_EVENT: <Star className="h-3 w-3" />,
+  APPLICATIONS: <FileCheck className="h-3 w-3" />,
+  INTERVIEWS: <CalendarCheck className="h-3 w-3" />,
+  OFFERS: <Gift className="h-3 w-3" />,
+  REJECTIONS: <XCircle className="h-3 w-3" />,
+  RECRUITERS: <UserCheck className="h-3 w-3" />,
+  NETWORKING: <Star className="h-3 w-3" />,
+  CAREER: <Star className="h-3 w-3" />,
+  IMPORTANT: <Award className="h-3 w-3" />,
+  OTHER: <Mail className="h-3 w-3" />,
 };
 
 function getCategoryIcon(category: string | null) {

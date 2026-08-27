@@ -743,6 +743,7 @@ model EmailMessage {
   recipients         String?
   subject            String?
   snippet            String?
+  body               String?         @db.Text
   receivedAt         DateTime?
   isRead             Boolean         @default(false)
   isStarred          Boolean         @default(false)

@@ -5,19 +5,17 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Mail, Loader2, Inbox, Plug, Unplug, RefreshCw,
-  Search, Filter, CheckCircle2, AlertCircle, Clock,
+  Search, CheckCircle2, AlertCircle, Clock,
   Briefcase, UserCheck, XCircle, CalendarCheck, Gift,
-  Star, Megaphone, Users, FileCheck, MessageSquare, Award,
-  ArrowRight, Copy, ChevronDown, ChevronUp,
+  Star, Users, FileCheck, MessageSquare,
+  Copy, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { getGmailStatus, disconnectGmail } from "@/actions/gmail";
-import { syncGmailInbox, getInboxEmails, getGmailSyncStatus } from "@/actions/gmail-sync";
-import { importEmailAsApplication } from "@/actions/gmail";
+import { getGmailStatus, disconnectGmail, importEmailAsApplication } from "@/actions/gmail";
+import { syncGmailInbox, getInboxEmails, getGmailSyncStatus, getInboxStats } from "@/actions/gmail-sync";
 import { formatDistanceToNow } from "date-fns";
 
 interface EmailRecord {
@@ -27,6 +25,7 @@ interface EmailRecord {
   senderEmail: string | null;
   subject: string | null;
   snippet: string | null;
+  body: string | null;
   receivedAt: Date | null;
   isRead: boolean;
   category: string | null;
@@ -44,25 +43,23 @@ interface EmailRecord {
 }
 
 const CATEGORY_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  JOB_OPPORTUNITY: { label: "Job Opportunity", icon: <Briefcase className="h-3 w-3" />, color: "bg-blue-500/10 text-blue-600 border-blue-200" },
-  APPLICATION_CONFIRMATION: { label: "Application Confirmed", icon: <CheckCircle2 className="h-3 w-3" />, color: "bg-teal-500/10 text-teal-600 border-teal-200" },
-  APPLICATION_UPDATE: { label: "Application Update", icon: <FileCheck className="h-3 w-3" />, color: "bg-cyan-500/10 text-cyan-600 border-cyan-200" },
-  RECRUITER_CONTACT: { label: "Recruiter", icon: <UserCheck className="h-3 w-3" />, color: "bg-purple-500/10 text-purple-600 border-purple-200" },
-  EMPLOYER_CONTACT: { label: "Employer", icon: <Users className="h-3 w-3" />, color: "bg-violet-500/10 text-violet-600 border-violet-200" },
-  INTERVIEW_INVITATION: { label: "Interview", icon: <CalendarCheck className="h-3 w-3" />, color: "bg-emerald-500/10 text-emerald-600 border-emerald-200" },
-  INTERVIEW_RESCHEDULE: { label: "Rescheduled", icon: <CalendarCheck className="h-3 w-3" />, color: "bg-amber-500/10 text-amber-600 border-amber-200" },
-  INTERVIEW_REMINDER: { label: "Interview Reminder", icon: <Clock className="h-3 w-3" />, color: "bg-emerald-500/10 text-emerald-600 border-emerald-200" },
-  REJECTION: { label: "Rejection", icon: <XCircle className="h-3 w-3" />, color: "bg-red-500/10 text-red-600 border-red-200" },
-  OFFER: { label: "Offer", icon: <Gift className="h-3 w-3" />, color: "bg-amber-500/10 text-amber-600 border-amber-200" },
-  FOLLOW_UP: { label: "Follow Up", icon: <Mail className="h-3 w-3" />, color: "bg-sky-500/10 text-sky-600 border-sky-200" },
-  CAREER_EVENT: { label: "Career Event", icon: <Star className="h-3 w-3" />, color: "bg-indigo-500/10 text-indigo-600 border-indigo-200" },
-  ASSESSMENT: { label: "Assessment", icon: <Award className="h-3 w-3" />, color: "bg-orange-500/10 text-orange-600 border-orange-200" },
-  NETWORKING: { label: "Networking", icon: <Users className="h-3 w-3" />, color: "bg-pink-500/10 text-pink-600 border-pink-200" },
-  NEWSLETTER: { label: "Newsletter", icon: <Megaphone className="h-3 w-3" />, color: "bg-gray-500/10 text-gray-600 border-gray-200" },
-  PROMOTION: { label: "Promotion", icon: <Megaphone className="h-3 w-3" />, color: "bg-yellow-500/10 text-yellow-600 border-yellow-200" },
-  PERSONAL: { label: "Personal", icon: <MessageSquare className="h-3 w-3" />, color: "bg-slate-500/10 text-slate-600 border-slate-200" },
-  OTHER: { label: "Other", icon: <Mail className="h-3 w-3" />, color: "bg-muted text-muted-foreground border-border" },
+  ALL: { label: "All Mail", icon: <Inbox className="h-4 w-4" />, color: "bg-gray-500/10 text-gray-600 border-gray-200" },
+  JOB_OPPORTUNITY: { label: "Job Opportunities", icon: <Briefcase className="h-4 w-4" />, color: "bg-blue-500/10 text-blue-600 border-blue-200" },
+  APPLICATIONS: { label: "Applications", icon: <FileCheck className="h-4 w-4" />, color: "bg-cyan-500/10 text-cyan-600 border-cyan-200" },
+  INTERVIEWS: { label: "Interviews", icon: <CalendarCheck className="h-4 w-4" />, color: "bg-emerald-500/10 text-emerald-600 border-emerald-200" },
+  OFFERS: { label: "Offers", icon: <Gift className="h-4 w-4" />, color: "bg-amber-500/10 text-amber-600 border-amber-200" },
+  REJECTIONS: { label: "Rejections", icon: <XCircle className="h-4 w-4" />, color: "bg-red-500/10 text-red-600 border-red-200" },
+  RECRUITERS: { label: "Recruiters", icon: <UserCheck className="h-4 w-4" />, color: "bg-purple-500/10 text-purple-600 border-purple-200" },
+  NETWORKING: { label: "Networking", icon: <Users className="h-4 w-4" />, color: "bg-pink-500/10 text-pink-600 border-pink-200" },
+  CAREER: { label: "Career", icon: <Star className="h-4 w-4" />, color: "bg-indigo-500/10 text-indigo-600 border-indigo-200" },
+  IMPORTANT: { label: "Important", icon: <AlertCircle className="h-4 w-4" />, color: "bg-orange-500/10 text-orange-600 border-orange-200" },
+  OTHER: { label: "Other", icon: <Mail className="h-4 w-4" />, color: "bg-muted text-muted-foreground border-border" },
 };
+
+const SMART_FOLDERS = [
+  "ALL", "JOB_OPPORTUNITY", "APPLICATIONS", "INTERVIEWS", "OFFERS",
+  "REJECTIONS", "RECRUITERS", "NETWORKING", "CAREER", "IMPORTANT", "OTHER",
+];
 
 function getCategoryMeta(category: string | null) {
   if (!category) return CATEGORY_META.OTHER;
@@ -80,7 +77,7 @@ export function EmailDigestPanel() {
   const [importing, startImport] = useTransition();
   const [importedIds, setImportedIds] = useState<Set<string>>(new Set());
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
-  const [expandedDraft, setExpandedDraft] = useState<string | null>(null);
+  const [expandedEmail, setExpandedEmail] = useState<string | null>(null);
 
   const [gmailConnected, setGmailConnected] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{
@@ -89,8 +86,9 @@ export function EmailDigestPanel() {
     jobsDiscovered: number;
   } | null>(null);
 
+  const [folderStats, setFolderStats] = useState<Record<string, number>>({});
+  const [activeFolder, setActiveFolder] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   // Handle OAuth redirect query params
   useEffect(() => {
@@ -100,7 +98,6 @@ export function EmailDigestPanel() {
       toast.success("Gmail connected! Syncing your inbox...");
       setGmailConnected(true);
       window.history.replaceState({}, "", window.location.pathname);
-      // Auto-sync after connect
       handleSync();
     } else if (gmailParam === "error") {
       const reason = params.get("reason");
@@ -110,23 +107,24 @@ export function EmailDigestPanel() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadStatus = useCallback(async () => {
-    const [statusRes, gmailRes] = await Promise.all([
+  const loadStatusAndStats = useCallback(async () => {
+    const [statusRes, gmailRes, statsRes] = await Promise.all([
       getGmailSyncStatus(),
       getGmailStatus(),
+      getInboxStats(),
     ]);
     if (gmailRes.success && gmailRes.data) setGmailConnected(gmailRes.data.connected);
     if (statusRes.success && statusRes.data) setSyncStatus(statusRes.data);
+    if (statsRes.success && statsRes.data) setFolderStats(statsRes.data);
     setInitializing(false);
   }, []);
 
-  const loadEmails = useCallback(async (currentPage = 1, filter: string | null = null) => {
+  const loadEmails = useCallback(async (currentPage = 1, folder = "ALL") => {
     setLoading(true);
     const res = await getInboxEmails({
-      category: filter ?? undefined,
+      category: folder,
       page: currentPage,
-      pageSize: 20,
-      jobRelatedOnly: !filter,
+      pageSize: 25,
     });
     if (res.success && res.data) {
       if (currentPage === 1) {
@@ -141,25 +139,23 @@ export function EmailDigestPanel() {
   }, []);
 
   useEffect(() => {
-    loadStatus();
-  }, [loadStatus]);
+    loadStatusAndStats();
+  }, [loadStatusAndStats]);
 
   useEffect(() => {
     if (!initializing && gmailConnected) {
-      loadEmails(1, categoryFilter);
+      loadEmails(1, activeFolder);
       setPage(1);
     }
-  }, [initializing, gmailConnected, categoryFilter, loadEmails]);
+  }, [initializing, gmailConnected, activeFolder, loadEmails]);
 
   function handleSync() {
     startSync(async () => {
       const res = await syncGmailInbox();
       if (res.success && res.data) {
-        toast.success(
-          `Synced ${res.data.emailsProcessed} emails${res.data.jobsDiscovered > 0 ? `, found ${res.data.jobsDiscovered} new job${res.data.jobsDiscovered !== 1 ? "s" : ""}` : ""}`
-        );
-        await loadStatus();
-        await loadEmails(1, categoryFilter);
+        toast.success(`Synced ${res.data.emailsProcessed} emails.`);
+        await loadStatusAndStats();
+        await loadEmails(1, activeFolder);
         setPage(1);
       } else if (!res.success) {
         toast.error(res.error ?? "Failed to sync inbox");
@@ -170,7 +166,7 @@ export function EmailDigestPanel() {
   function handleLoadMore() {
     const nextPage = page + 1;
     setPage(nextPage);
-    loadEmails(nextPage, categoryFilter);
+    loadEmails(nextPage, activeFolder);
   }
 
   async function handleDisconnect() {
@@ -180,6 +176,7 @@ export function EmailDigestPanel() {
       setGmailConnected(false);
       setEmails([]);
       setSyncStatus(null);
+      setFolderStats({});
     } else {
       toast.error(res.error ?? "Failed to disconnect");
     }
@@ -202,7 +199,8 @@ export function EmailDigestPanel() {
         company: email.sender ?? undefined,
         role: email.subject?.replace(/^re:\s*/i, "") ?? undefined,
       };
-      const res = await importEmailAsApplication(mockMsg, mockClass);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = await importEmailAsApplication(mockMsg as any, mockClass as any);
       if (res.success) {
         toast.success("Added to Applications");
         setImportedIds(prev => new Set([...prev, email.id]));
@@ -219,6 +217,7 @@ export function EmailDigestPanel() {
 
   // Client-side search filter
   const visible = emails.filter(e => {
+    if (dismissedIds.has(e.id)) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -237,285 +236,316 @@ export function EmailDigestPanel() {
     );
   }
 
+  // Not connected state
+  if (!gmailConnected) {
+    return (
+      <div className="text-center py-16 border-2 border-dashed rounded-xl space-y-4">
+        <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+          <Mail className="h-8 w-8 text-primary" />
+        </div>
+        <div>
+          <p className="font-semibold text-lg">Connect Gmail for Smart Folders</p>
+          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+            HireFlow ingests your inbox and automatically categorizes your emails into Smart Folders like Job Opportunities, Applications, and Offers.
+          </p>
+        </div>
+        <Button onClick={() => { window.location.href = "/api/auth/gmail/connect"; }} className="gap-2">
+          <Plug className="h-4 w-4" /> Connect Gmail
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <h3 className="font-semibold flex items-center gap-2">
-            <Inbox className="h-5 w-5" /> Email Intelligence
+    <div className="border rounded-xl bg-background flex flex-col md:flex-row overflow-hidden shadow-sm" style={{ minHeight: "700px" }}>
+      {/* ───── Sidebar: Smart Folders ───── */}
+      <div className="w-full md:w-60 border-b md:border-b-0 md:border-r bg-muted/30 flex flex-col shrink-0">
+        <div className="p-4 border-b bg-background/50 backdrop-blur-sm flex items-center justify-between">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <Inbox className="h-4 w-4" /> Smart Folders
           </h3>
-          {syncStatus && (
-            <Badge variant="outline" className="text-[10px] gap-1 py-0.5">
-              <Clock className="h-2.5 w-2.5" />
-              {syncStatus.lastSyncedAt
-                ? `Synced ${formatDistanceToNow(new Date(syncStatus.lastSyncedAt), { addSuffix: true })}`
-                : "Never synced"}
-            </Badge>
-          )}
+          <Button variant="ghost" size="sm" onClick={handleDisconnect} title="Disconnect Gmail" className="h-6 w-6 p-0">
+            <Unplug className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+          </Button>
         </div>
 
-        <div className="flex items-center gap-2">
-          {!gmailConnected ? (
-            <Button onClick={() => { window.location.href = "/api/auth/gmail/connect"; }} size="sm" className="gap-2">
-              <Plug className="h-4 w-4" /> Connect Gmail
-            </Button>
-          ) : (
-            <>
-              <Badge variant="outline" className="text-[11px] gap-1 py-1 text-emerald-600 border-emerald-200">
-                <Mail className="h-3 w-3" /> Gmail connected
-              </Badge>
-              {syncStatus && (
-                <span className="text-xs text-muted-foreground">
-                  {syncStatus.emailCount} emails · {syncStatus.jobsDiscovered} jobs found
-                </span>
-              )}
-              <Button onClick={handleSync} disabled={syncing} size="sm" className="gap-2">
-                {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                {syncing ? "Syncing..." : "Sync Inbox"}
-              </Button>
-              <Button onClick={() => { window.location.href = "/api/auth/gmail/connect"; }} size="sm" variant="secondary" className="gap-2" title="Choose a new Gmail account or start afresh">
-                <Mail className="h-4 w-4" /> Reconnect
-              </Button>
-              <Button variant="ghost" size="icon-xs" onClick={handleDisconnect} title="Disconnect Gmail">
-                <Unplug className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-              </Button>
-            </>
-          )}
+        <div className="flex-1 overflow-y-auto p-2">
+          <div className="space-y-0.5">
+            {SMART_FOLDERS.map((folder) => {
+              const meta = getCategoryMeta(folder);
+              const count = folderStats[folder] || 0;
+              const isActive = activeFolder === folder;
+
+              return (
+                <button
+                  key={folder}
+                  onClick={() => { setActiveFolder(folder); setExpandedEmail(null); }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-all ${
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={isActive ? "text-primary-foreground/80" : "text-muted-foreground/70"}>
+                      {meta.icon}
+                    </span>
+                    <span className="font-medium text-[13px]">{meta.label}</span>
+                  </div>
+                  {count > 0 && (
+                    <span className={`text-[11px] tabular-nums px-1.5 py-0.5 rounded-full ${
+                      isActive
+                        ? "bg-primary-foreground/20 text-primary-foreground"
+                        : "bg-muted-foreground/10 text-muted-foreground"
+                    }`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Sync controls */}
+        <div className="p-3 border-t bg-background/50 backdrop-blur-sm space-y-2">
+          <Button onClick={handleSync} disabled={syncing} size="sm" className="w-full gap-2" variant="outline">
+            {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {syncing ? "Syncing..." : "Sync Inbox"}
+          </Button>
+          <Button onClick={() => { window.location.href = "/api/auth/gmail/connect"; }} size="sm" variant="secondary" className="w-full gap-2">
+            <Mail className="h-4 w-4" /> Reconnect
+          </Button>
+          <div className="text-[10px] text-center text-muted-foreground">
+            {syncStatus?.lastSyncedAt
+              ? `Last synced ${formatDistanceToNow(new Date(syncStatus.lastSyncedAt), { addSuffix: true })}`
+              : "Never synced"}
+          </div>
         </div>
       </div>
 
-      {/* Not connected empty state */}
-      {!gmailConnected && (
-        <div className="text-center py-16 border-2 border-dashed rounded-xl space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-            <Mail className="h-8 w-8 text-primary" />
-          </div>
-          <div>
-            <p className="font-semibold">Connect Gmail to let HireFlow understand your job search</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              HireFlow will scan your inbox and automatically discover job opportunities, interviews, offers, and rejections.
-            </p>
-          </div>
-          <Button onClick={() => { window.location.href = "/api/auth/gmail/connect"; }} className="gap-2">
-            <Plug className="h-4 w-4" /> Connect Gmail
-          </Button>
-        </div>
-      )}
-
-      {/* Connected but no emails yet */}
-      {gmailConnected && !loading && emails.length === 0 && (
-        <div className="text-center py-12 border-2 border-dashed rounded-xl space-y-3">
-          <Inbox className="h-10 w-10 mx-auto text-muted-foreground/40" />
-          <div>
-            <p className="font-medium text-sm">No relevant emails found yet</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {syncStatus?.lastSyncedAt
-                ? "No job-related emails were found in your recent inbox. Try syncing again or check back later."
-                : "Click \"Sync Inbox\" to scan your Gmail for job opportunities, interviews, and offers."}
-            </p>
-          </div>
-          {!syncStatus?.lastSyncedAt && (
-            <Button onClick={handleSync} disabled={syncing} size="sm" className="gap-2">
-              {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Sync Now
-            </Button>
-          )}
-        </div>
-      )}
-
-      {/* Filters + Search */}
-      {gmailConnected && emails.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 min-w-[180px]">
+      {/* ───── Main Content Pane ───── */}
+      <div className="flex-1 flex flex-col min-w-0 bg-background relative">
+        {/* Header */}
+        <div className="h-14 border-b flex items-center justify-between px-4 shrink-0 bg-background z-10">
+          <h2 className="font-semibold text-base flex items-center gap-2">
+            {getCategoryMeta(activeFolder).icon}
+            {getCategoryMeta(activeFolder).label}
+            {totalEmails > 0 && (
+              <Badge variant="secondary" className="text-[10px] ml-1">{totalEmails}</Badge>
+            )}
+          </h2>
+          <div className="relative w-56 hidden sm:block">
             <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Search emails..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="h-8 pl-8 text-xs"
+              className="h-8 pl-8 text-xs bg-muted/50"
             />
           </div>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 h-8 text-xs font-medium hover:bg-accent">
-              <Filter className="h-3.5 w-3.5" />
-              {categoryFilter ? (getCategoryMeta(categoryFilter).label) : "All Categories"}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="text-xs">
-              <DropdownMenuItem onClick={() => setCategoryFilter(null)}>All Categories</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setCategoryFilter("JOB_OPPORTUNITY")}>Job Opportunity</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setCategoryFilter("RECRUITER_CONTACT")}>Recruiter</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setCategoryFilter("INTERVIEW_INVITATION")}>Interview</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setCategoryFilter("REJECTION")}>Rejection</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setCategoryFilter("OFFER")}>Offer</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setCategoryFilter("APPLICATION_CONFIRMATION")}>Application Confirmed</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setCategoryFilter("ASSESSMENT")}>Assessment</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setCategoryFilter("FOLLOW_UP")}>Follow Up</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
-      )}
 
-      {/* Email List */}
-      <div className="space-y-2">
-        <AnimatePresence>
-          {visible.length === 0 && !loading && (
-            <div className="text-center py-12 text-muted-foreground border rounded-lg bg-muted/20">
-              <Inbox className="h-8 w-8 mx-auto mb-3 opacity-20" />
-              <p>No actionable emails found.</p>
-              {(searchQuery || categoryFilter) && (
-                <Button variant="link" onClick={() => { setSearchQuery(""); setCategoryFilter(null); }} className="mt-2 text-xs h-auto p-0">Clear filters</Button>
+        {/* Email List */}
+        <div className="flex-1 overflow-y-auto p-4 bg-muted/5">
+          <div className="max-w-3xl mx-auto space-y-2 pb-8">
+            <AnimatePresence mode="popLayout">
+              {/* Empty state */}
+              {visible.length === 0 && !loading && !syncing && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center py-20 text-muted-foreground border-2 border-dashed rounded-xl bg-background mt-4"
+                >
+                  <Inbox className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                  <p className="font-medium text-foreground">
+                    {activeFolder === "ALL" && folderStats.ALL === 0
+                      ? "No emails synced yet"
+                      : `No ${getCategoryMeta(activeFolder).label.toLowerCase()} found`}
+                  </p>
+                  <p className="text-sm mt-1 max-w-sm mx-auto">
+                    {activeFolder !== "ALL" && folderStats.ALL > 0 && (
+                      <>We scanned <strong className="text-foreground">{folderStats.ALL}</strong> recent emails but found none in this category.</>
+                    )}
+                    {activeFolder === "ALL" && folderStats.ALL === 0 && (
+                      <>Click &quot;Sync Inbox&quot; to fetch your recent emails.</>
+                    )}
+                  </p>
+                  {searchQuery && (
+                    <Button variant="link" onClick={() => setSearchQuery("")} className="mt-4">Clear search</Button>
+                  )}
+                </motion.div>
               )}
-            </div>
-          )}
-          {visible.map((email, i) => {
-            const meta = getCategoryMeta(email.category);
-            const isImported = importedIds.has(email.id);
-            const isDismissed = dismissedIds.has(email.id);
-            if (isDismissed) return null;
 
-            return (
-              <motion.div
-                key={email.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, height: 0, scale: 0.97 }}
-                transition={{ delay: i * 0.015, duration: 0.2 }}
-              >
-                <Card className={`transition-opacity ${isImported ? "opacity-50" : ""} ${!email.isRead ? "border-primary/30" : ""}`}>
-                  <CardContent className="p-3">
-                    <div className="flex items-start gap-3">
-                      {/* Urgency dot */}
-                      <div className="mt-1.5 shrink-0">
-                        <span className={`block h-2.5 w-2.5 rounded-full ${
-                          (email.urgency ?? 0) > 0.7 ? "bg-red-500 shadow-sm shadow-red-500/50" :
-                          (email.urgency ?? 0) > 0.4 ? "bg-orange-400" :
-                          (email.importance ?? 0) > 0.5 ? "bg-yellow-400" : "bg-gray-300"
-                        }`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border font-medium ${meta.color}`}>
-                            {meta.icon} {meta.label}
-                          </span>
-                          {!email.isRead && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" title="Unread" />
-                          )}
-                          {email.action && (
-                            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
-                              <ArrowRight className="h-2.5 w-2.5" /> {email.action}
-                            </span>
-                          )}
-                        </div>
-                        <h4 className="font-medium text-sm mt-1 truncate">{email.subject || "(No Subject)"}</h4>
-                        <p className="text-xs text-muted-foreground">
-                          {email.sender || email.senderEmail || "Unknown sender"}
-                          {email.receivedAt && (
-                            <span className="ml-2 opacity-60">
-                              · {formatDistanceToNow(new Date(email.receivedAt), { addSuffix: true })}
-                            </span>
-                          )}
-                        </p>
-                        {email.snippet && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2 opacity-80">{email.snippet}</p>
-                        )}
+              {/* Email cards */}
+              {visible.map((email) => {
+                const meta = getCategoryMeta(email.category);
+                const isImported = importedIds.has(email.id);
+                const isExpanded = expandedEmail === email.id;
 
-                        {/* Reply Draft expandable */}
-                        {email.replyDraft && (
-                          <div className="mt-2">
-                            <button
-                              onClick={() => setExpandedDraft(expandedDraft === email.id ? null : email.id)}
-                              className="inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 font-medium transition-colors"
-                            >
-                              <MessageSquare className="h-3 w-3" />
-                              {expandedDraft === email.id ? "Hide" : "View"} Reply Draft
-                              {expandedDraft === email.id ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                            </button>
-                            {expandedDraft === email.id && (
-                              <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: "auto" }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="mt-2 p-3 rounded-lg bg-muted/50 border text-xs whitespace-pre-wrap"
+                return (
+                  <motion.div
+                    key={email.id}
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Card
+                      className={`overflow-hidden transition-all duration-200 cursor-pointer hover:border-primary/40 ${
+                        isExpanded ? "ring-1 ring-primary shadow-md" : "shadow-sm"
+                      } ${isImported ? "opacity-60" : ""} ${!email.isRead ? "border-l-4 border-l-primary" : ""}`}
+                      onClick={() => setExpandedEmail(isExpanded ? null : email.id)}
+                    >
+                      <CardContent className="p-0">
+                        {/* Summary Row */}
+                        <div className="p-4 flex items-start gap-3">
+                          {/* Urgency dot */}
+                          <div className="mt-1.5 shrink-0">
+                            <span className={`block h-2.5 w-2.5 rounded-full ${
+                              (email.urgency ?? 0) > 0.7 ? "bg-red-500 shadow-sm shadow-red-500/50" :
+                              (email.urgency ?? 0) > 0.4 ? "bg-orange-400" :
+                              (email.importance ?? 0) > 0.5 ? "bg-yellow-400" : "bg-gray-300"
+                            }`} />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="font-semibold text-sm truncate max-w-[200px]">
+                                {email.sender || email.senderEmail || "Unknown"}
+                              </span>
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                {email.receivedAt ? formatDistanceToNow(new Date(email.receivedAt), { addSuffix: true }) : ""}
+                              </span>
+                              {activeFolder === "ALL" && email.category && email.category !== "OTHER" && (
+                                <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border font-medium ml-auto ${meta.color}`}>
+                                  {meta.icon} {meta.label}
+                                </span>
+                              )}
+                            </div>
+                            <h4 className="font-medium text-[14px] truncate mb-1">
+                              {email.subject || "(No Subject)"}
+                            </h4>
+                            <p className="text-xs text-muted-foreground line-clamp-1">{email.snippet}</p>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="shrink-0 flex items-center gap-1">
+                            {!isImported && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => { e.stopPropagation(); handleDismiss(email.id); }}
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                title="Dismiss"
                               >
-                                {email.replyDraft}
-                                <button
-                                  onClick={() => { navigator.clipboard.writeText(email.replyDraft!); toast.success("Copied to clipboard"); }}
-                                  className="mt-2 inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 font-medium"
+                                <XCircle className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {(email.jobRelated || email.applicationRelated || email.interviewRelated || email.offerRelated) && (
+                              isImported ? (
+                                <Badge className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-200">
+                                  <CheckCircle2 className="h-3 w-3 mr-0.5" /> Added
+                                </Badge>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => { e.stopPropagation(); handleImport(email); }}
+                                  disabled={importing}
+                                  className="h-7 text-xs gap-1"
                                 >
-                                  <Copy className="h-3 w-3" /> Copy
-                                </button>
-                              </motion.div>
+                                  <Briefcase className="h-3 w-3" /> Add
+                                </Button>
+                              )
                             )}
                           </div>
-                        )}
-                      </div>
+                        </div>
 
-                      <div className="shrink-0 flex items-center gap-1">
-                        {!isImported && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleDismiss(email.id)}
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                            title="Dismiss"
-                          >
-                            <XCircle className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                        {email.applicationRelated || email.jobRelated || email.interviewRelated || email.offerRelated ? (
-                          isImported ? (
-                            <Badge className="text-[10px] bg-emerald-500/10 text-emerald-600">
-                              <CheckCircle2 className="h-3 w-3 mr-0.5" /> Added
-                            </Badge>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleImport(email)}
-                              disabled={importing}
-                              className="h-7 text-xs gap-1"
+                        {/* Expanded Detail View */}
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="border-t bg-muted/10 overflow-hidden"
                             >
-                              {importing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Briefcase className="h-3 w-3" />}
-                              Add to Apps
-                            </Button>
-                          )
-                        ) : null}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+                              <div className="p-4 space-y-4">
+                                {/* AI Insights bar */}
+                                {email.confidence != null && email.confidence > 0.3 && (
+                                  <div className="flex gap-4 p-3 rounded-lg bg-primary/5 border border-primary/10 flex-wrap">
+                                    <div className="flex-1 space-y-1 min-w-[200px]">
+                                      <h5 className="text-xs font-semibold text-primary uppercase tracking-wider flex items-center gap-1">
+                                        <Star className="h-3 w-3" /> AI Insights
+                                      </h5>
+                                      <div className="flex gap-4 text-xs flex-wrap">
+                                        <span><span className="text-muted-foreground">Category:</span> {getCategoryMeta(email.category).label}</span>
+                                        <span><span className="text-muted-foreground">Confidence:</span> {Math.round(email.confidence * 100)}%</span>
+                                        {email.action && <span><span className="text-muted-foreground">Action:</span> {email.action}</span>}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
 
-        {/* Load More */}
-        {hasMore && !searchQuery && (
-          <div className="text-center pt-2">
-            <Button variant="outline" size="sm" onClick={handleLoadMore} disabled={loading} className="gap-2">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Load More ({totalEmails - emails.length} remaining)
-            </Button>
-          </div>
-        )}
+                                {/* Reply Draft */}
+                                {email.replyDraft && (
+                                  <div className="p-3 rounded-lg bg-muted/50 border">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                                        <MessageSquare className="h-3 w-3" /> Suggested Reply
+                                      </h5>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(email.replyDraft!); toast.success("Copied!"); }}
+                                        className="inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 font-medium"
+                                      >
+                                        <Copy className="h-3 w-3" /> Copy
+                                      </button>
+                                    </div>
+                                    <p className="text-sm whitespace-pre-wrap">{email.replyDraft}</p>
+                                  </div>
+                                )}
 
-        {/* Search empty state */}
-        {visible.length === 0 && emails.length > 0 && searchQuery && (
-          <div className="text-center py-6 text-muted-foreground">
-            <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-40" />
-            <p className="text-sm">No emails match your search.</p>
-          </div>
-        )}
+                                {/* Email Body */}
+                                <div>
+                                  <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Message Body</h5>
+                                  <div className="text-sm bg-background border rounded-lg p-4 whitespace-pre-wrap max-h-96 overflow-y-auto leading-relaxed">
+                                    {email.body || email.snippet || "No body content available."}
+                                  </div>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
 
-        {/* Syncing indicator */}
-        {syncing && (
-          <div className="text-center py-4 text-muted-foreground text-sm flex items-center justify-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Scanning your Gmail inbox for job-related emails...
+            {/* Load More */}
+            {hasMore && !searchQuery && (
+              <div className="text-center pt-4">
+                <Button variant="outline" onClick={handleLoadMore} disabled={loading} className="gap-2">
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Load More ({totalEmails - emails.length} remaining)
+                </Button>
+              </div>
+            )}
+
+            {/* Syncing indicator */}
+            {syncing && (
+              <div className="flex justify-center p-4">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted rounded-full text-sm text-muted-foreground shadow-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Scanning your Gmail inbox...
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

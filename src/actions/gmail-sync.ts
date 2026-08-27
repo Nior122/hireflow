@@ -25,24 +25,23 @@ async function extractAndStoreMemoryFromGmail(userId: string, text: string) {
 
 const EmailClassificationSchema = z.object({
   category: z.enum([
-    "JOB_OPPORTUNITY", "APPLICATION_CONFIRMATION", "APPLICATION_UPDATE", "RECRUITER_CONTACT", "EMPLOYER_CONTACT",
-    "INTERVIEW_INVITATION", "INTERVIEW_RESCHEDULE", "INTERVIEW_REMINDER", "REJECTION", "OFFER",
-    "FOLLOW_UP", "CAREER_EVENT", "ASSESSMENT", "NETWORKING", "NEWSLETTER", "PROMOTION", "PERSONAL", "OTHER",
+    "JOB_OPPORTUNITY", "APPLICATIONS", "INTERVIEWS", "OFFERS", "REJECTIONS",
+    "RECRUITERS", "NETWORKING", "CAREER", "IMPORTANT", "OTHER"
   ]),
   confidence: z.number().min(0).max(1),
-  jobRelated: z.boolean(),
-  applicationRelated: z.boolean(),
-  interviewRelated: z.boolean(),
-  rejectionRelated: z.boolean(),
-  offerRelated: z.boolean(),
-  company: z.string().optional(),
-  role: z.string().optional(),
+  jobRelated: z.boolean().default(false),
+  applicationRelated: z.boolean().default(false),
+  interviewRelated: z.boolean().default(false),
+  rejectionRelated: z.boolean().default(false),
+  offerRelated: z.boolean().default(false),
+  company: z.string().nullable().optional(),
+  role: z.string().nullable().optional(),
   summary: z.string().optional(),
   actionRequired: z.boolean().default(false),
-  action: z.string().optional(),
+  action: z.string().nullable().optional(),
   urgency: z.number().min(0).max(1).default(0),
   importance: z.number().min(0).max(1).default(0),
-  replyDraft: z.string().optional(),
+  replyDraft: z.string().nullable().optional(),
 });
 
 type EmailClassification = z.infer<typeof EmailClassificationSchema>;
@@ -60,6 +59,7 @@ interface InboxEmailRecord {
   senderEmail: string | null;
   subject: string | null;
   snippet: string | null;
+  body: string | null;
   receivedAt: Date | null;
   isRead: boolean;
   category: string | null;
@@ -113,66 +113,69 @@ async function getValidGmailToken(userId: string): Promise<string | null> {
   return token.accessToken;
 }
 
-function deterministicClassify(subject: string, snippet: string): EmailClassification {
-  const text = `${subject} ${snippet}`.toLowerCase();
+function deterministicClassify(text: string): EmailClassification {
+  text = text.toLowerCase();
 
-  if (/interview|schedule a call|phone screen|video call|hiring manager|we'd like to meet/.test(text)) {
-    return { category: "INTERVIEW_INVITATION", confidence: 0.75, jobRelated: true, applicationRelated: false, interviewRelated: true, rejectionRelated: false, offerRelated: false, actionRequired: true, urgency: 0.8, importance: 0.9 };
-  }
-  if (/unfortunately|not moving forward|not selected|not a fit|other candidates|wish you the best/.test(text)) {
-    return { category: "REJECTION", confidence: 0.8, jobRelated: true, applicationRelated: false, interviewRelated: false, rejectionRelated: true, offerRelated: false, actionRequired: false, urgency: 0.3, importance: 0.7 };
-  }
-  if (/pleased to offer|offer letter|compensation package|start date|sign your offer/.test(text)) {
-    return { category: "OFFER", confidence: 0.85, jobRelated: true, applicationRelated: false, interviewRelated: false, rejectionRelated: false, offerRelated: true, actionRequired: true, urgency: 0.9, importance: 1.0 };
-  }
-  if (/thank you for applying|application received|application confirmed|we received your/.test(text)) {
-    return { category: "APPLICATION_CONFIRMATION", confidence: 0.8, jobRelated: true, applicationRelated: true, interviewRelated: false, rejectionRelated: false, offerRelated: false, actionRequired: false, urgency: 0.2, importance: 0.5 };
-  }
-  if (/job opportunity|open position|hiring|we are looking for|exciting role|are you interested/.test(text)) {
-    return { category: "JOB_OPPORTUNITY", confidence: 0.7, jobRelated: true, applicationRelated: false, interviewRelated: false, rejectionRelated: false, offerRelated: false, actionRequired: true, urgency: 0.6, importance: 0.6 };
-  }
-  if (/recruiter|talent acquisition|sourcing|linkedin recruiter|i came across your profile/.test(text)) {
-    return { category: "RECRUITER_CONTACT", confidence: 0.7, jobRelated: true, applicationRelated: false, interviewRelated: false, rejectionRelated: false, offerRelated: false, actionRequired: true, urgency: 0.5, importance: 0.6 };
-  }
-  if (/follow.?up|checking in|wanted to follow|any update/.test(text)) {
-    return { category: "FOLLOW_UP", confidence: 0.65, jobRelated: true, applicationRelated: false, interviewRelated: false, rejectionRelated: false, offerRelated: false, actionRequired: true, urgency: 0.7, importance: 0.5 };
+  let partial: any = { category: "OTHER", confidence: 0.5 };
+
+  if (/interview|schedule a call|phone screen|video call/.test(text)) {
+    partial = { category: "INTERVIEWS", confidence: 0.75, interviewRelated: true, jobRelated: true };
+  } else if (/unfortunately|not moving forward|not selected|not a fit/.test(text)) {
+    partial = { category: "REJECTIONS", confidence: 0.8, rejectionRelated: true, jobRelated: true };
+  } else if (/pleased to offer|offer letter|compensation package/.test(text)) {
+    partial = { category: "OFFERS", confidence: 0.85, offerRelated: true, jobRelated: true };
+  } else if (/thank you for applying|application received|we received your/.test(text)) {
+    partial = { category: "APPLICATIONS", confidence: 0.8, applicationRelated: true, jobRelated: true };
+  } else if (/job opportunity|open position|hiring|exciting role/.test(text)) {
+    partial = { category: "JOB_OPPORTUNITY", confidence: 0.7, jobRelated: true };
+  } else if (/recruiter|talent acquisition|sourcing/.test(text)) {
+    partial = { category: "RECRUITERS", confidence: 0.7, jobRelated: true };
+  } else if (/deadline|action required|important/.test(text)) {
+    partial = { category: "IMPORTANT", confidence: 0.65, jobRelated: true };
   }
 
-  return { category: "OTHER", confidence: 0.5, jobRelated: false, applicationRelated: false, interviewRelated: false, rejectionRelated: false, offerRelated: false, actionRequired: false, urgency: 0.1, importance: 0.1 };
+  return EmailClassificationSchema.parse(partial);
 }
 
 async function aiClassifyEmail(
   subject: string,
   sender: string,
-  snippet: string
+  snippet: string,
+  body: string
 ): Promise<EmailClassification> {
   const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return deterministicClassify(subject, snippet);
+  if (!apiKey) return deterministicClassify(`${subject} ${snippet}`);
 
-  const prompt = `You are an email classifier for a job search assistant. Classify this email and extract job-related information.
+  // Limit body for token usage
+  const limitedBody = body ? body.substring(0, 1500) : "";
+
+  const prompt = `You are a personal AI career assistant. Classify this email and extract career-related information.
+Do NOT invent missing information. If company or role cannot be determined, return null.
 
 Email:
 Subject: ${subject}
 From: ${sender}
 Snippet: ${snippet}
+Body:
+${limitedBody}
 
 Respond ONLY with a JSON object matching this schema (no markdown, no extra text):
 {
-  "category": "JOB_OPPORTUNITY|APPLICATION_CONFIRMATION|APPLICATION_UPDATE|RECRUITER_CONTACT|EMPLOYER_CONTACT|INTERVIEW_INVITATION|INTERVIEW_RESCHEDULE|INTERVIEW_REMINDER|REJECTION|OFFER|FOLLOW_UP|CAREER_EVENT|ASSESSMENT|NETWORKING|NEWSLETTER|PROMOTION|PERSONAL|OTHER",
+  "category": "JOB_OPPORTUNITY|APPLICATIONS|INTERVIEWS|OFFERS|REJECTIONS|RECRUITERS|NETWORKING|CAREER|IMPORTANT|OTHER",
   "confidence": 0.0-1.0,
   "jobRelated": boolean,
   "applicationRelated": boolean,
   "interviewRelated": boolean,
   "rejectionRelated": boolean,
   "offerRelated": boolean,
-  "company": "company name if found",
-  "role": "job title if found",
+  "company": "company name if found, else null",
+  "role": "job title if found, else null",
   "summary": "1-sentence summary",
   "actionRequired": boolean,
-  "action": "Recommended next action (e.g. 'Prepare for interview', 'Reply to recruiter') or null",
+  "action": "Recommended next action or null",
   "urgency": 0.0-1.0,
   "importance": 0.0-1.0,
-  "replyDraft": "Generate a short polite email reply if actionRequired is true and it makes sense, otherwise null"
+  "replyDraft": "Polite draft if actionRequired else null"
 }`;
 
   try {
@@ -183,9 +186,39 @@ Respond ONLY with a JSON object matching this schema (no markdown, no extra text
 
     const parsed = JSON.parse(response.trim());
     return EmailClassificationSchema.parse(parsed);
-  } catch {
-    return deterministicClassify(subject, snippet);
+  } catch (err) {
+    console.error("[aiClassifyEmail] error:", err);
+    return deterministicClassify(`${subject} ${snippet}`);
   }
+}
+
+// Extract body text recursively from Gmail payload parts
+function extractEmailBody(payload: any): string {
+  if (!payload) return "";
+  let body = "";
+
+  if (payload.body?.data) {
+    body += Buffer.from(payload.body.data, "base64url").toString("utf-8") + "\n";
+  }
+
+  if (payload.parts) {
+    for (const part of payload.parts) {
+      if (part.mimeType === "text/plain" || part.mimeType === "text/html") {
+        if (part.body?.data) {
+          body += Buffer.from(part.body.data, "base64url").toString("utf-8") + "\n";
+        }
+      } else if (part.parts) {
+        body += extractEmailBody(part) + "\n";
+      }
+    }
+  }
+
+  // Strip simple HTML tags for AI context
+  return body.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+             .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+             .replace(/<[^>]*>?/gm, ' ')
+             .replace(/\s+/g, ' ')
+             .trim();
 }
 
 function parseEmailAddress(raw: string): { name: string; email: string } {
@@ -204,9 +237,9 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
       return { success: false, error: "Gmail not connected. Please connect Gmail in Settings first." };
     }
 
-    // Fetch latest 50 messages (metadata only first for efficiency)
+    // Fetch latest 100 messages to get a useful batch of real emails
     const listRes = await fetch(
-      "https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=50&q=newer_than:30d",
+      "https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=100&q=newer_than:60d",
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
 
@@ -224,9 +257,9 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
 
     for (const msg of messageList) {
       try {
-        // Fetch metadata for each message
+        // Fetch full message to get the actual body
         const metaRes = await fetch(
-          `https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Date`,
+          `https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
           { headers: { Authorization: `Bearer ${accessToken}` } }
         );
         if (!metaRes.ok) continue;
@@ -254,8 +287,12 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
           receivedAt = new Date(parseInt(meta.internalDate));
         }
 
-        // AI classify (fast, only subject + snippet to minimize token usage)
-        const classification = await aiClassifyEmail(subject, fromRaw, snippet);
+        // Extract the actual email body
+        const bodyText = extractEmailBody(meta.payload);
+        const limitedBody = bodyText.slice(0, 2500);
+
+        // AI classify (using subject, snippet, and actual body)
+        const classification = await aiClassifyEmail(subject, fromRaw, snippet, limitedBody);
 
         // Upsert EmailMessage
         const savedEmail = await prisma.emailMessage.upsert({
@@ -269,6 +306,7 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
             recipients: to || null,
             subject: subject || null,
             snippet: snippet.slice(0, 500) || null,
+            body: limitedBody || null,
             receivedAt,
             isRead,
             labels: labelIds,
@@ -283,12 +321,13 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
             importance: classification.importance,
             action: classification.action ?? null,
             replyDraft: classification.replyDraft ?? null,
-            jobApplicationId: null, // Default to null, we will update it below if we find a match
+            jobApplicationId: null,
           },
           update: {
             isRead,
             labels: labelIds,
-            // Don't overwrite AI classification if already done
+            // Only update body if we didn't have one before
+            ...(limitedBody ? { body: limitedBody } : {}),
           },
         });
 
@@ -344,7 +383,7 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
               }
             }
           }
-        } else if (classification.category === "INTERVIEW_INVITATION" || classification.category === "INTERVIEW_RESCHEDULE") {
+        } else if (classification.category === "INTERVIEWS") {
           const interviewDetails = await extractInterviewDetails(subject, snippet);
           const company = classification.company?.trim() || "Unknown Company";
           const title = classification.role?.trim() || "Unknown Role";
@@ -395,7 +434,7 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
 
         // ─── Recruiter Contact Extraction ──────────────────────────────────
         if (
-          (classification.category === "RECRUITER_CONTACT" || classification.category === "EMPLOYER_CONTACT") &&
+          classification.category === "RECRUITERS" &&
           senderEmail
         ) {
           const existingContact = await prisma.recruiterContact.findFirst({
@@ -425,7 +464,7 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
                 email: senderEmail,
                 company: classification.company?.trim() || null,
                 role: classification.role?.trim() || null,
-                relationship: classification.category === "RECRUITER_CONTACT" ? "RECRUITER" : "EMPLOYER",
+                relationship: "RECRUITER",
                 lastContactedAt: receivedAt ?? new Date(),
                 communicationCount: 1,
                 sourceEmailIds: [savedEmail.id],
@@ -435,15 +474,15 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
         }
 
         // ─── Career Reminder / Deadline Extraction ───────────────────────────
-        if (classification.category === "ASSESSMENT" || classification.category === "INTERVIEW_INVITATION") {
-          // Create a career reminder for interviews and assessments
-          const interviewDetails = classification.category === "INTERVIEW_INVITATION"
+        if (classification.category === "INTERVIEWS" || classification.category === "IMPORTANT") {
+          // Create a career reminder for interviews and important deadlines
+          const interviewDetails = classification.category === "INTERVIEWS"
             ? await extractInterviewDetails(subject, snippet).catch(() => null)
             : null;
           const deadlineDate = interviewDetails?.date ? new Date(interviewDetails.date) : null;
 
           if (deadlineDate && !isNaN(deadlineDate.getTime())) {
-            const reminderType = classification.category === "ASSESSMENT" ? "ASSESSMENT_DEADLINE" : "INTERVIEW_DATE";
+            const reminderType = classification.category === "IMPORTANT" ? "ASSESSMENT_DEADLINE" : "INTERVIEW_DATE";
             const existingReminder = await prisma.careerReminder.findFirst({
               where: {
                 userId: user.id,
@@ -520,6 +559,47 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
   }
 }
 
+export async function getInboxStats(): Promise<ActionResponse<Record<string, number>>> {
+  try {
+    const user = await createOrGetUser();
+    
+    const stats = await prisma.emailMessage.groupBy({
+      by: ['category'],
+      where: { userId: user.id },
+      _count: true,
+    });
+    
+    const allMailCount = await prisma.emailMessage.count({ where: { userId: user.id } });
+    
+    const result: Record<string, number> = {
+      ALL: allMailCount,
+      JOB_OPPORTUNITY: 0,
+      APPLICATIONS: 0,
+      INTERVIEWS: 0,
+      OFFERS: 0,
+      REJECTIONS: 0,
+      RECRUITERS: 0,
+      NETWORKING: 0,
+      CAREER: 0,
+      IMPORTANT: 0,
+      OTHER: 0,
+    };
+    
+    for (const stat of stats) {
+      if (stat.category && stat.category in result) {
+        result[stat.category] = stat._count;
+      } else if (stat.category) {
+        // Fallback for old categories if any exist
+        result.OTHER += stat._count;
+      }
+    }
+    
+    return { success: true, data: result };
+  } catch (err) {
+    return { success: false, error: "Failed to load stats." };
+  }
+}
+
 export async function getInboxEmails(options?: {
   category?: string;
   page?: number;
@@ -534,7 +614,7 @@ export async function getInboxEmails(options?: {
 
     const where = {
       userId: user.id,
-      ...(options?.category ? { category: options.category } : {}),
+      ...(options?.category && options.category !== 'ALL' ? { category: options.category } : {}),
       ...(options?.jobRelatedOnly ? { jobRelated: true } : {}),
     };
 

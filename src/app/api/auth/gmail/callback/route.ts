@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
       where: { userId: dbUser.id },
       update: {
         accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token ?? "",
+        ...(tokens.refresh_token ? { refreshToken: tokens.refresh_token } : {}),
         expiryDate: tokens.expiry_date
           ? new Date(tokens.expiry_date)
           : new Date(Date.now() + 3_600_000),
