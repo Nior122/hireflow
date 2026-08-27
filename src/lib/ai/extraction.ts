@@ -38,11 +38,46 @@ Email Snippet: ${snippet}
   "applicationUrl": "url string or null"
 }`;
 
+function parseJsonFromLlm(raw: string): any {
+  let cleaned = raw.trim();
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  }
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  }
+  return JSON.parse(cleaned);
+}
+
+export async function extractJobDetails(subject: string, snippet: string): Promise<JobExtraction | null> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+
+  const prompt = `Extract structured job details from this email. Only output JSON matching the schema. No markdown, no text.
+Email Subject: ${subject}
+Email Snippet: ${snippet}
+
+{
+  "company": "string or null",
+  "title": "job title or null",
+  "location": "string or null",
+  "employmentType": "FULL_TIME, PART_TIME, CONTRACT, INTERNSHIP, or null",
+  "remoteType": "REMOTE, HYBRID, ONSITE, or null",
+  "salaryMin": number or null,
+  "salaryMax": number or null,
+  "salaryCurrency": "USD, EUR, etc. or null",
+  "requirements": "brief string or null",
+  "applicationUrl": "url string or null"
+}`;
+
   try {
     const provider = new GroqProvider();
     const response = await provider.chat([{ role: "user", content: prompt }], { temperature: 0.1, maxTokens: 512 });
-    return JobExtractionSchema.parse(JSON.parse(response.trim()));
-  } catch {
+    return JobExtractionSchema.parse(parseJsonFromLlm(response));
+  } catch (err) {
+    console.error("[extractJobDetails] LLM error:", err);
     return null;
   }
 }
@@ -77,8 +112,9 @@ Email Snippet: ${snippet}
   try {
     const provider = new GroqProvider();
     const response = await provider.chat([{ role: "user", content: prompt }], { temperature: 0.1, maxTokens: 512 });
-    return InterviewExtractionSchema.parse(JSON.parse(response.trim()));
-  } catch {
+    return InterviewExtractionSchema.parse(parseJsonFromLlm(response));
+  } catch (err) {
+    console.error("[extractInterviewDetails] LLM error:", err);
     return null;
   }
 }

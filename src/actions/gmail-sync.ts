@@ -117,24 +117,100 @@ async function getValidGmailToken(userId: string): Promise<string | null> {
   return token.accessToken;
 }
 
+function parseJsonFromLlm(raw: string): any {
+  let cleaned = raw.trim();
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  }
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  }
+  return JSON.parse(cleaned);
+}
+
+function inferCompanyAndRole(
+  extractedCompany?: string | null,
+  extractedRole?: string | null,
+  subject?: string | null,
+  senderName?: string | null,
+  senderEmail?: string | null
+): { company: string; role: string } {
+  let company = extractedCompany?.trim() || "";
+  let role = extractedRole?.trim() || "";
+
+  const cleanSubject = subject || "";
+  const cleanSender = senderName || "";
+  const cleanEmail = senderEmail || "";
+
+  // 1. Infer company from Subject regex patterns if missing
+  if (!company) {
+    const atMatch = cleanSubject.match(/(?:at|with|for)\s+([A-Z][A-Za-z0-9\s.&'-]+)/);
+    if (atMatch) {
+      company = atMatch[1].split(/[-–—|:]/)[0].trim();
+    } else {
+      const dashMatch = cleanSubject.match(/^([A-Z][A-Za-z0-9\s.&'-]+)\s*[-–—|:]/);
+      if (dashMatch && !/thank|application|interview|rejection|status|your|job/i.test(dashMatch[1])) {
+        company = dashMatch[1].trim();
+      }
+    }
+  }
+
+  // 2. Infer company from Sender Name
+  if (!company && cleanSender) {
+    const cleanSenderName = cleanSender.replace(/\b(Careers|Recruiting|Talent|HR|Team|Jobs|Notifications|No-Reply|Hiring)\b/gi, "").trim();
+    if (cleanSenderName && cleanSenderName.length > 1) {
+      company = cleanSenderName;
+    }
+  }
+
+  // 3. Infer company from Sender Email Domain
+  if (!company && cleanEmail && cleanEmail.includes("@")) {
+    const domain = cleanEmail.split("@")[1]?.toLowerCase();
+    const commonMailers = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com", "greenhouse.io", "lever.co", "workday.com", "ashbyhq.com", "smartrecruiters.com"];
+    if (domain && !commonMailers.includes(domain)) {
+      const domainName = domain.split(".")[0];
+      if (domainName) {
+        company = domainName.charAt(0).toUpperCase() + domainName.slice(1);
+      }
+    }
+  }
+
+  if (!company) {
+    company = cleanSender || "Company";
+  }
+
+  // Infer Role from Subject if missing
+  if (!role && cleanSubject) {
+    const roleMatch = cleanSubject.match(/(?:for|role|position|as)\s+([A-Za-z0-9\s/-]+?)(?:\s+at|\s+with|\s*[-–—|:]|$)/i);
+    if (roleMatch) {
+      role = roleMatch[1].trim();
+    }
+  }
+  if (!role) role = "Software Role";
+
+  return { company, role };
+}
+
 function deterministicClassify(text: string): EmailClassification {
   text = text.toLowerCase();
 
   let partial: any = { category: "OTHER", confidence: 0.5 };
 
-  if (/interview|schedule a call|phone screen|video call/.test(text)) {
-    partial = { category: "INTERVIEWS", confidence: 0.75, interviewRelated: true, jobRelated: true };
-  } else if (/unfortunately|not moving forward|not selected|not a fit/.test(text)) {
-    partial = { category: "REJECTIONS", confidence: 0.8, rejectionRelated: true, jobRelated: true };
-  } else if (/pleased to offer|offer letter|compensation package/.test(text)) {
-    partial = { category: "OFFERS", confidence: 0.85, offerRelated: true, jobRelated: true };
-  } else if (/thank you for applying|application received|we received your/.test(text)) {
-    partial = { category: "APPLICATIONS", confidence: 0.8, applicationRelated: true, jobRelated: true };
-  } else if (/job opportunity|open position|hiring|exciting role/.test(text)) {
-    partial = { category: "JOB_OPPORTUNITY", confidence: 0.7, jobRelated: true };
-  } else if (/recruiter|talent acquisition|sourcing/.test(text)) {
-    partial = { category: "RECRUITERS", confidence: 0.7, jobRelated: true };
-  } else if (/deadline|action required|important/.test(text)) {
+  if (/interview|schedule|phone screen|video call|coding challenge|assessment|coderpad|hackerrank|availability|meet with/i.test(text)) {
+    partial = { category: "INTERVIEWS", confidence: 0.8, interviewRelated: true, jobRelated: true };
+  } else if (/unfortunately|not moving forward|not selected|not a fit|other candidates|regret to inform|position has been filled|pursuing other|decision on your/i.test(text)) {
+    partial = { category: "REJECTIONS", confidence: 0.85, rejectionRelated: true, jobRelated: true };
+  } else if (/pleased to offer|offer letter|compensation package|employment offer|congratulations/i.test(text)) {
+    partial = { category: "OFFERS", confidence: 0.9, offerRelated: true, jobRelated: true };
+  } else if (/thank you for applying|application received|we received|application update|application status|confirmation|submission|applied/i.test(text)) {
+    partial = { category: "APPLICATIONS", confidence: 0.85, applicationRelated: true, jobRelated: true };
+  } else if (/job opportunity|open position|hiring|exciting role|we are looking for|position available|join our team|engineer|developer|architect/i.test(text)) {
+    partial = { category: "JOB_OPPORTUNITY", confidence: 0.75, jobRelated: true };
+  } else if (/recruiter|talent acquisition|sourcing|headhunter|outreach|saw your profile|saw your linkedin/i.test(text)) {
+    partial = { category: "RECRUITERS", confidence: 0.75, jobRelated: true };
+  } else if (/deadline|action required|important/i.test(text)) {
     partial = { category: "IMPORTANT", confidence: 0.65, jobRelated: true };
   }
 
@@ -150,7 +226,6 @@ async function aiClassifyEmail(
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return deterministicClassify(`${subject} ${snippet}`);
 
-  // Limit body for token usage
   const limitedBody = body ? body.substring(0, 1500) : "";
 
   const prompt = `You are a personal AI career assistant. Classify this email and extract career-related information.
@@ -188,10 +263,10 @@ Respond ONLY with a JSON object matching this schema (no markdown, no extra text
       { role: "user", content: prompt }
     ], { temperature: 0.1, maxTokens: 512 });
 
-    const parsed = JSON.parse(response.trim());
+    const parsed = parseJsonFromLlm(response);
     return EmailClassificationSchema.parse(parsed);
   } catch (err) {
-    console.error("[aiClassifyEmail] error:", err);
+    console.error("[aiClassifyEmail] LLM parsing error, using fallback:", err);
     return deterministicClassify(`${subject} ${snippet}`);
   }
 }
@@ -344,13 +419,20 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
         // ─── Entity Extraction Pipeline ──────────────────────────────────
         let linkedJobAppId: string | null = null;
 
-        const extractedCompany = classification.company?.trim();
-        const extractedRole = classification.role?.trim();
+        const { company: inferredCompany, role: inferredRole } = inferCompanyAndRole(
+          classification.company,
+          classification.role,
+          subject,
+          sender,
+          senderEmail
+        );
+
+        console.log(`[GMAIL SYNC] msgId=${msg.id} | category=${classification.category} | company="${inferredCompany}" | role="${inferredRole}" | subject="${subject}"`);
 
         if (classification.category === "JOB_OPPORTUNITY") {
           const jobDetails = await extractJobDetails(subject, snippet);
-          const company = jobDetails?.company || extractedCompany || "";
-          const title = jobDetails?.title || extractedRole || "";
+          const company = jobDetails?.company || inferredCompany;
+          const title = jobDetails?.title || inferredRole;
 
           if (company && title) {
             const existingApp = await prisma.jobApplication.findFirst({
@@ -393,36 +475,34 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
             }
           }
         } else if (classification.category === "APPLICATIONS") {
-          const company = extractedCompany || (subject.includes("at ") ? subject.split("at ")[1]?.split(" ")[0] : "");
-          const role = extractedRole || (subject.includes("for ") ? subject.split("for ")[1]?.split(" at")[0] : "Applicant");
+          const company = inferredCompany;
+          const role = inferredRole;
 
-          if (company) {
-            let existingApp = await prisma.jobApplication.findFirst({
-              where: {
+          let existingApp = await prisma.jobApplication.findFirst({
+            where: {
+              userId: user.id,
+              company: { equals: company, mode: "insensitive" },
+            }
+          });
+
+          if (!existingApp) {
+            existingApp = await prisma.jobApplication.create({
+              data: {
                 userId: user.id,
-                company: { equals: company, mode: "insensitive" },
+                company,
+                role: role || "Software Role",
+                status: "APPLIED",
+                source: "Gmail Sync",
+                sourceEmailId: savedEmail.id,
               }
             });
-
-            if (!existingApp) {
-              existingApp = await prisma.jobApplication.create({
-                data: {
-                  userId: user.id,
-                  company,
-                  role: role || "Software Role",
-                  status: "APPLIED",
-                  source: "Gmail Sync",
-                  sourceEmailId: savedEmail.id,
-                }
-              });
-              applicationsDiscovered++;
-            }
-            linkedJobAppId = existingApp.id;
+            applicationsDiscovered++;
           }
+          linkedJobAppId = existingApp.id;
         } else if (classification.category === "INTERVIEWS") {
           const interviewDetails = await extractInterviewDetails(subject, snippet);
-          const company = extractedCompany || "Tech Company";
-          const title = extractedRole || "Job Role";
+          const company = inferredCompany;
+          const title = inferredRole;
 
           let existingApp = await prisma.jobApplication.findFirst({
             where: {
@@ -469,52 +549,52 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
             interviewsDiscovered++;
           }
         } else if (classification.category === "REJECTIONS") {
-          if (extractedCompany) {
-            const existingApp = await prisma.jobApplication.findFirst({
-              where: {
-                userId: user.id,
-                company: { equals: extractedCompany, mode: "insensitive" },
-              }
-            });
-            if (existingApp) {
-              await prisma.jobApplication.update({
-                where: { id: existingApp.id },
-                data: { status: "REJECTED" }
-              });
-              linkedJobAppId = existingApp.id;
-              rejectionsDiscovered++;
+          const company = inferredCompany;
+          const existingApp = await prisma.jobApplication.findFirst({
+            where: {
+              userId: user.id,
+              company: { equals: company, mode: "insensitive" },
             }
+          });
+          if (existingApp) {
+            await prisma.jobApplication.update({
+              where: { id: existingApp.id },
+              data: { status: "REJECTED" }
+            });
+            linkedJobAppId = existingApp.id;
+            rejectionsDiscovered++;
           }
         } else if (classification.category === "OFFERS") {
-          if (extractedCompany) {
-            let existingApp = await prisma.jobApplication.findFirst({
-              where: {
+          const company = inferredCompany;
+          const role = inferredRole;
+
+          let existingApp = await prisma.jobApplication.findFirst({
+            where: {
+              userId: user.id,
+              company: { equals: company, mode: "insensitive" },
+            }
+          });
+
+          if (existingApp) {
+            await prisma.jobApplication.update({
+              where: { id: existingApp.id },
+              data: { status: "OFFER" }
+            });
+          } else {
+            existingApp = await prisma.jobApplication.create({
+              data: {
                 userId: user.id,
-                company: { equals: extractedCompany, mode: "insensitive" },
+                company,
+                role: role || "Job Role",
+                status: "OFFER",
+                source: "Gmail Sync",
+                sourceEmailId: savedEmail.id,
               }
             });
-
-            if (existingApp) {
-              await prisma.jobApplication.update({
-                where: { id: existingApp.id },
-                data: { status: "OFFER" }
-              });
-            } else {
-              existingApp = await prisma.jobApplication.create({
-                data: {
-                  userId: user.id,
-                  company: extractedCompany,
-                  role: extractedRole || "Job Role",
-                  status: "OFFER",
-                  source: "Gmail Sync",
-                  sourceEmailId: savedEmail.id,
-                }
-              });
-              applicationsDiscovered++;
-            }
-            linkedJobAppId = existingApp.id;
-            offersDiscovered++;
+            applicationsDiscovered++;
           }
+          linkedJobAppId = existingApp.id;
+          offersDiscovered++;
         }
 
         // ─── Recruiter Contact Extraction ──────────────────────────────────
