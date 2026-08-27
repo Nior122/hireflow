@@ -10,7 +10,8 @@ import { JobResultsGrid } from "./JobResultsGrid";
 import { JobDetailDrawer } from "./JobDetailDrawer";
 import { SavedJobsView } from "./SavedJobsView";
 import { getSavedJobs } from "@/actions/discover";
-import { getDiscoveredJobs, selectDiscoveredJob } from "@/actions/gmail-sync";
+import { getDiscoveredJobs } from "@/actions/gmail-sync";
+import { selectDiscoveredJob } from "@/actions/jobs";
 import type { JobResult, JobSearchParams, SavedJobData } from "@/lib/types";
 import { toast } from "sonner";
 
