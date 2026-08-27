@@ -4,7 +4,7 @@ import { createOrGetUser } from "@/lib/clerk";
 import { getValidGmailToken } from "@/actions/gmail-sync";
 import { prisma } from "@/lib/prisma";
 import { GroqProvider } from "@/lib/ai/providers";
-import { EmailClassificationSchema } from "@/lib/ai";
+
 
 function safeBase64UrlDecode(str: string): string {
   if (!str) return "";
@@ -143,7 +143,7 @@ function deterministicClassify(text: string): any {
     partial = { category: "IMPORTANT", confidence: 0.65, jobRelated: true };
   }
 
-  return EmailClassificationSchema.parse(partial);
+  return partial;
 }
 
 export async function GET(req: Request) {
