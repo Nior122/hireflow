@@ -49,6 +49,10 @@ type EmailClassification = z.infer<typeof EmailClassificationSchema>;
 interface GmailSyncSummary {
   emailsProcessed: number;
   jobsDiscovered: number;
+  applicationsDiscovered: number;
+  interviewsDiscovered: number;
+  rejectionsDiscovered: number;
+  offersDiscovered: number;
   syncedAt: Date;
 }
 
@@ -254,6 +258,10 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
 
     let emailsProcessed = 0;
     let jobsDiscovered = 0;
+    let applicationsDiscovered = 0;
+    let interviewsDiscovered = 0;
+    let rejectionsDiscovered = 0;
+    let offersDiscovered = 0;
 
     for (const msg of messageList) {
       try {
@@ -333,16 +341,18 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
 
         emailsProcessed++;
 
-        // Job Discovery & Normalization
+        // ─── Entity Extraction Pipeline ──────────────────────────────────
         let linkedJobAppId: string | null = null;
+
+        const extractedCompany = classification.company?.trim();
+        const extractedRole = classification.role?.trim();
 
         if (classification.category === "JOB_OPPORTUNITY") {
           const jobDetails = await extractJobDetails(subject, snippet);
-          const company = jobDetails?.company || classification.company?.trim() || "";
-          const title = jobDetails?.title || classification.role?.trim() || "";
+          const company = jobDetails?.company || extractedCompany || "";
+          const title = jobDetails?.title || extractedRole || "";
 
           if (company && title) {
-            // 1. Check if an active JobApplication already exists
             const existingApp = await prisma.jobApplication.findFirst({
               where: {
                 userId: user.id,
@@ -354,7 +364,6 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
             if (existingApp) {
               linkedJobAppId = existingApp.id;
             } else {
-              // 2. No active app found, check if DiscoveredJob exists
               const existingDiscovered = await prisma.discoveredJob.findFirst({
                 where: {
                   userId: user.id,
@@ -383,52 +392,128 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
               }
             }
           }
-        } else if (classification.category === "INTERVIEWS") {
-          const interviewDetails = await extractInterviewDetails(subject, snippet);
-          const company = classification.company?.trim() || "Unknown Company";
-          const title = classification.role?.trim() || "Unknown Role";
-          
-          if (interviewDetails && interviewDetails.date) {
-            const scheduledAt = new Date(interviewDetails.date);
-            if (!isNaN(scheduledAt.getTime())) {
-              // Try to link to an application
-              const existingApp = await prisma.jobApplication.findFirst({
-                where: {
-                  userId: user.id,
-                  company: { equals: company, mode: "insensitive" },
-                },
-                orderBy: { createdAt: 'desc' }
-              });
+        } else if (classification.category === "APPLICATIONS") {
+          const company = extractedCompany || (subject.includes("at ") ? subject.split("at ")[1]?.split(" ")[0] : "");
+          const role = extractedRole || (subject.includes("for ") ? subject.split("for ")[1]?.split(" at")[0] : "Applicant");
 
-              if (existingApp) {
-                linkedJobAppId = existingApp.id;
+          if (company) {
+            let existingApp = await prisma.jobApplication.findFirst({
+              where: {
+                userId: user.id,
+                company: { equals: company, mode: "insensitive" },
               }
+            });
 
-              // Create interview
-              await prisma.interview.create({
+            if (!existingApp) {
+              existingApp = await prisma.jobApplication.create({
                 data: {
                   userId: user.id,
                   company,
-                  position: title,
-                  scheduledAt,
-                  location: interviewDetails.location || null,
-                  meetingLink: interviewDetails.meetingUrl || null,
-                  notes: interviewDetails.instructions || null,
-                  applicationId: existingApp?.id || null,
+                  role: role || "Software Role",
+                  status: "APPLIED",
+                  source: "Gmail Sync",
+                  sourceEmailId: savedEmail.id,
                 }
               });
+              applicationsDiscovered++;
             }
+            linkedJobAppId = existingApp.id;
           }
-        } else if (classification.company && classification.role) {
-          const existingApp = await prisma.jobApplication.findFirst({
+        } else if (classification.category === "INTERVIEWS") {
+          const interviewDetails = await extractInterviewDetails(subject, snippet);
+          const company = extractedCompany || "Tech Company";
+          const title = extractedRole || "Job Role";
+
+          let existingApp = await prisma.jobApplication.findFirst({
             where: {
               userId: user.id,
-              company: { equals: classification.company.trim(), mode: "insensitive" },
-              role: { equals: classification.role.trim(), mode: "insensitive" },
-            }
+              company: { equals: company, mode: "insensitive" },
+            },
+            orderBy: { createdAt: 'desc' }
           });
+
           if (existingApp) {
+            await prisma.jobApplication.update({
+              where: { id: existingApp.id },
+              data: { status: "INTERVIEW" }
+            });
+          } else {
+            existingApp = await prisma.jobApplication.create({
+              data: {
+                userId: user.id,
+                company,
+                role: title,
+                status: "INTERVIEW",
+                source: "Gmail Sync",
+                sourceEmailId: savedEmail.id,
+              }
+            });
+            applicationsDiscovered++;
+          }
+          linkedJobAppId = existingApp.id;
+
+          const scheduledAt = interviewDetails?.date ? new Date(interviewDetails.date) : new Date(Date.now() + 86400000 * 2);
+          if (!isNaN(scheduledAt.getTime())) {
+            await prisma.interview.create({
+              data: {
+                userId: user.id,
+                company,
+                position: title,
+                scheduledAt,
+                location: interviewDetails?.location || null,
+                meetingLink: interviewDetails?.meetingUrl || null,
+                notes: interviewDetails?.instructions || null,
+                applicationId: existingApp.id,
+              }
+            });
+            interviewsDiscovered++;
+          }
+        } else if (classification.category === "REJECTIONS") {
+          if (extractedCompany) {
+            const existingApp = await prisma.jobApplication.findFirst({
+              where: {
+                userId: user.id,
+                company: { equals: extractedCompany, mode: "insensitive" },
+              }
+            });
+            if (existingApp) {
+              await prisma.jobApplication.update({
+                where: { id: existingApp.id },
+                data: { status: "REJECTED" }
+              });
+              linkedJobAppId = existingApp.id;
+              rejectionsDiscovered++;
+            }
+          }
+        } else if (classification.category === "OFFERS") {
+          if (extractedCompany) {
+            let existingApp = await prisma.jobApplication.findFirst({
+              where: {
+                userId: user.id,
+                company: { equals: extractedCompany, mode: "insensitive" },
+              }
+            });
+
+            if (existingApp) {
+              await prisma.jobApplication.update({
+                where: { id: existingApp.id },
+                data: { status: "OFFER" }
+              });
+            } else {
+              existingApp = await prisma.jobApplication.create({
+                data: {
+                  userId: user.id,
+                  company: extractedCompany,
+                  role: extractedRole || "Job Role",
+                  status: "OFFER",
+                  source: "Gmail Sync",
+                  sourceEmailId: savedEmail.id,
+                }
+              });
+              applicationsDiscovered++;
+            }
             linkedJobAppId = existingApp.id;
+            offersDiscovered++;
           }
         }
 
@@ -551,7 +636,15 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
     revalidatePath("/dashboard");
     return {
       success: true,
-      data: { emailsProcessed, jobsDiscovered, syncedAt: new Date() },
+      data: {
+        emailsProcessed,
+        jobsDiscovered,
+        applicationsDiscovered,
+        interviewsDiscovered,
+        rejectionsDiscovered,
+        offersDiscovered,
+        syncedAt: new Date()
+      },
     };
   } catch (err) {
     console.error("[gmail-sync] fatal error:", err instanceof Error ? err.message : "unknown");

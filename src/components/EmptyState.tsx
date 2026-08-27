@@ -19,7 +19,10 @@ export function EmptyState() {
       try {
         const result = await syncGmailInbox();
         if (result.success) {
-          toast.success(`Inbox scanned! Found ${result.data?.jobsDiscovered ?? 0} jobs.`);
+          const d = result.data;
+          toast.success(
+            `Inbox synced! Processed ${d?.emailsProcessed ?? 0} emails. Discovered ${d?.applicationsDiscovered ?? 0} applications, ${d?.interviewsDiscovered ?? 0} interviews, and ${d?.jobsDiscovered ?? 0} opportunities.`
+          );
           router.refresh();
         } else {
           toast.error(result.error ?? "Failed to scan Gmail. Please check your connection in Settings.");

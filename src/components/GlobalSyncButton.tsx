@@ -16,7 +16,8 @@ export function GlobalSyncButton() {
       try {
         const result = await syncGmailInbox();
         if (result.success) {
-          toast.success(`Inbox synced! Processed ${result.data?.emailsProcessed ?? 0} emails, found ${result.data?.jobsDiscovered ?? 0} jobs.`);
+          const d = result.data;
+          toast.success(`Synced! Processed ${d?.emailsProcessed ?? 0} emails. Discovered ${d?.applicationsDiscovered ?? 0} apps, ${d?.interviewsDiscovered ?? 0} interviews & ${d?.jobsDiscovered ?? 0} jobs.`);
           router.refresh();
         } else {
           toast.error(result.error ?? "Failed to sync Gmail. Please connect in Settings.");
