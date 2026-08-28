@@ -78,28 +78,8 @@ export function JobSeekerDashboard({ userId, widgets }: Props) {
     );
   }
 
-  const apps = applications ?? [];
-
-  if (apps.length === 0) {
-    return (
-      <div className="space-y-4">
-        <div className="flex justify-end gap-2">
-          <GlobalSyncButton />
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowDigest(!showDigest)}>
-            <Inbox className="h-4 w-4" /> Email Digest
-          </Button>
-        </div>
-        {showDigest && (
-          <div className="mb-4 p-4 rounded-xl border bg-card">
-            <EmailDigestPanel />
-          </div>
-        )}
-        <EmptyState />
-      </div>
-    );
-  }
-
   const isFiltering = filters.search || filters.statuses.length > 0;
+  const apps = applications ?? [];
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -136,7 +116,9 @@ export function JobSeekerDashboard({ userId, widgets }: Props) {
         <EmailActionCenter />
       </div>
       <SearchFilterBar applications={apps} onFilterChange={handleFilterChange} />
-      {isFiltering && filteredApps.length === 0 ? (
+      {apps.length === 0 ? (
+        <EmptyState />
+      ) : isFiltering && filteredApps.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <p className="text-lg font-medium">No matching applications</p>
           <p className="text-sm mt-1">Try adjusting your search or filters</p>
