@@ -435,11 +435,8 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
         const bodyText = extractEmailBody(meta.payload);
         const limitedBody = bodyText.slice(0, 2500);
 
-        // AI classify (using subject, snippet, and actual body)
-        const classification = await aiClassifyEmail(subject, fromRaw, snippet, limitedBody);
-
-        // Upsert EmailMessage
-        const savedEmail = await prisma.emailMessage.upsert({
+        // Always save EmailMessage first to prevent data loss
+        let savedEmail = await prisma.emailMessage.upsert({
           where: { gmailMessageId: msg.id },
           create: {
             userId: user.id,
@@ -454,6 +451,29 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
             receivedAt,
             isRead,
             labels: labelIds,
+            // Fallback defaults until classified
+            category: "OTHER",
+          },
+          update: {
+            isRead,
+            labels: labelIds,
+            // DO NOT OVERWRITE category if already set, wait for re-classification
+          }
+        });
+
+        // AI classify with fallback
+        let classification;
+        try {
+          classification = await aiClassifyEmail(subject, fromRaw, snippet, limitedBody);
+        } catch (aiErr) {
+          console.warn("[gmail-sync] AI classification failed, using fallback:", aiErr instanceof Error ? aiErr.message : "unknown");
+          classification = deterministicClassify(`${subject} ${snippet}`);
+        }
+
+        // Update the EmailMessage with classification results
+        savedEmail = await prisma.emailMessage.update({
+          where: { id: savedEmail.id },
+          data: {
             category: classification.category,
             confidence: classification.confidence,
             jobRelated: classification.jobRelated,
@@ -466,8 +486,6 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
             action: classification.action ?? null,
             replyDraft: classification.replyDraft ?? null,
             jobApplicationId: null,
-          },
-          update: {
             isRead,
             labels: labelIds,
             // Only update body if we didn't have one before
@@ -949,5 +967,128 @@ export async function getGmailSyncStatus(): Promise<ActionResponse<{
     };
   } catch {
     return { success: false, error: "Failed to get sync status." };
+  }
+}
+
+export async function reprocessGmailEmails(): Promise<ActionResponse<any>> {
+  try {
+    const user = await createOrGetUser();
+    
+    // Fetch all existing emails
+    const emails = await prisma.emailMessage.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "asc" }
+    });
+    
+    let processed = 0;
+    let jobsDiscovered = 0;
+    let applicationsDiscovered = 0;
+    let interviewsDiscovered = 0;
+    
+    for (const msg of emails) {
+      // Just re-run classification and entity extraction
+      const subject = msg.subject || "";
+      const snippet = msg.snippet || "";
+      const limitedBody = (msg.body || "").slice(0, 2500);
+      const sender = msg.sender || "";
+      const senderEmail = msg.senderEmail || "";
+      
+      let classification;
+      try {
+        classification = await aiClassifyEmail(subject, senderEmail, snippet, limitedBody);
+      } catch (e) {
+        classification = deterministicClassify(`${subject} ${snippet}`);
+      }
+      
+      await prisma.emailMessage.update({
+        where: { id: msg.id },
+        data: {
+          category: classification.category,
+          jobRelated: classification.jobRelated,
+          applicationRelated: classification.applicationRelated,
+          interviewRelated: classification.interviewRelated,
+          rejectionRelated: classification.rejectionRelated,
+          offerRelated: classification.offerRelated,
+        }
+      });
+      
+      const { company: inferredCompany, role: inferredRole } = inferCompanyAndRole(
+        classification.company,
+        classification.role,
+        subject,
+        sender,
+        senderEmail
+      );
+      
+      // Basic entity generation fallback
+      if (classification.category === "JOB_OPPORTUNITY") {
+        if (inferredCompany && inferredRole) {
+          const existing = await prisma.discoveredJob.findFirst({
+            where: { userId: user.id, company: { equals: inferredCompany, mode: "insensitive" } }
+          });
+          if (!existing) {
+            await prisma.discoveredJob.create({
+              data: {
+                userId: user.id,
+                sourceEmailId: msg.id,
+                title: inferredRole,
+                company: inferredCompany,
+                status: "NEW"
+              }
+            });
+            jobsDiscovered++;
+          }
+        }
+      } else if (classification.category === "APPLICATIONS") {
+        if (inferredCompany) {
+          let app = await prisma.jobApplication.findFirst({
+            where: { userId: user.id, company: { equals: inferredCompany, mode: "insensitive" } }
+          });
+          if (!app) {
+            app = await prisma.jobApplication.create({
+              data: {
+                userId: user.id,
+                company: inferredCompany,
+                role: inferredRole || "Software Role",
+                status: "APPLIED",
+                source: "Gmail Reprocess",
+                sourceEmailId: msg.id
+              }
+            });
+            applicationsDiscovered++;
+          }
+        }
+      } else if (classification.category === "INTERVIEWS") {
+        if (inferredCompany) {
+          let app = await prisma.jobApplication.findFirst({
+            where: { userId: user.id, company: { equals: inferredCompany, mode: "insensitive" } }
+          });
+          if (app) {
+            await prisma.jobApplication.update({ where: { id: app.id }, data: { status: "INTERVIEW" } });
+          } else {
+            app = await prisma.jobApplication.create({
+              data: {
+                userId: user.id,
+                company: inferredCompany,
+                role: inferredRole || "Software Role",
+                status: "INTERVIEW",
+                source: "Gmail Reprocess",
+                sourceEmailId: msg.id
+              }
+            });
+            applicationsDiscovered++;
+          }
+          interviewsDiscovered++;
+        }
+      }
+      processed++;
+    }
+    
+    return {
+      success: true,
+      data: { processed, jobsDiscovered, applicationsDiscovered, interviewsDiscovered }
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Failed to reprocess emails" };
   }
 }

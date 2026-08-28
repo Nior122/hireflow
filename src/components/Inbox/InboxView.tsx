@@ -8,11 +8,12 @@ import EmailDetail from './EmailDetail';
 
 const CATEGORIES = [
   { id: 'ALL', label: 'All', icon: Inbox },
+  { id: 'APPLICATIONS', label: 'Applications', icon: FileText },
   { id: 'JOB_OPPORTUNITY', label: 'Jobs', icon: Briefcase },
-  { id: 'INTERVIEW', label: 'Interviews', icon: Calendar },
-  { id: 'RECRUITER', label: 'Recruiters', icon: Users },
-  { id: 'REJECTION', label: 'Rejections', icon: XCircle },
-  { id: 'OFFER', label: 'Offers', icon: Award },
+  { id: 'INTERVIEWS', label: 'Interviews', icon: Calendar },
+  { id: 'RECRUITERS', label: 'Recruiters', icon: Users },
+  { id: 'REJECTIONS', label: 'Rejections', icon: XCircle },
+  { id: 'OFFERS', label: 'Offers', icon: Award },
 ];
 
 interface InboxEmail {
