@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getAiConfigurationStatus } from "@/actions/ai-status";
 import { subscribeToReminders, unsubscribeFromReminders } from "@/lib/reminder-subscribe";
 import { checkout } from "@/actions/billing";
 import { getReminderPreferences, setReminderPreferences } from "@/actions/reminders";
@@ -33,6 +34,8 @@ export function SettingsDashboard() {
     jobsDiscovered: number;
   } | null>(null);
   
+  const [aiStatus, setAiStatus] = useState<Awaited<ReturnType<typeof getAiConfigurationStatus>> | null>(null);
+  useEffect(() => { getAiConfigurationStatus().then(setAiStatus).catch(() => {}); }, []);
   const [remindersEnabled, setRemindersEnabled] = useState(false);
   useEffect(() => { getReminderPreferences().then(p => setRemindersEnabled(p.enabled)); }, []);
   const [loading, setLoading] = useState(true);
@@ -79,6 +82,12 @@ export function SettingsDashboard() {
         </h2>
       </div>
 
+      {aiStatus && <div className="rounded-lg border p-3 text-sm" role="status">
+        <strong>AI runtime status:</strong> Groq key {aiStatus.keyConfigured ? 'available' : 'missing'}; model {aiStatus.modelConfigured ? 'available' : 'missing'}
+        {' '}in {aiStatus.environment}{aiStatus.deployment ? ` (deploy ${aiStatus.deployment})` : ''}.
+        {!aiStatus.modelConfigured && <p className="text-muted-foreground mt-1">Set GROQ_MODEL for this Vercel environment and branch, then redeploy. Values are never displayed here.</p>}
+        <Button type="button" variant="ghost" size="sm" className="ml-2" onClick={() => getAiConfigurationStatus().then(setAiStatus).catch(() => toast.error('Cannot check AI configuration'))}>Refresh</Button>
+      </div>}
       <Tabs defaultValue="profile" className="space-y-6">
         <div className="overflow-x-auto pb-2">
           <TabsList className="w-full justify-start h-12 p-1 bg-muted/50 backdrop-blur-xl border border-border/50 rounded-xl">

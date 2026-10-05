@@ -11,11 +11,13 @@ Add these variables in Vercel → Project → Settings → Environment Variables
 | Database | `DATABASE_URL` | Real reachable PostgreSQL URL (SSL as required by the provider). Use an isolated preview DB when testing writes. |
 | Clerk | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`, `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard`, `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard` | Add production/preview hostnames and redirect URLs to Clerk. Use keys from the matching Clerk environment. |
 | App URL | `NEXT_PUBLIC_APP_URL` | Canonical public HTTPS origin, without trailing slash. Set separately for previews where billing return URLs are tested. |
-| AI | `GROQ_API_KEY`, `GROQ_MODEL` | A live model supported by your Groq account; no default model is configured in code. |
+| AI | `GROQ_API_KEY`, `GROQ_MODEL` | A live model supported by your Groq account; the server reads the exact `GROQ_MODEL` name at runtime and does not hardcode a model. Set it for both Production and Preview if using PR deployments. |
 | Gmail | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_CALENDAR_REDIRECT_URI` | Register exact callback URLs in Google Cloud and enable Gmail/Calendar APIs. |
 | Stripe | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_PRO_YEARLY` | Real `price_…` IDs for the two Pro intervals. Register `https://<your-host>/api/webhooks/stripe` for `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, and `invoice.payment_failed`. Other paid tiers require their corresponding `STRIPE_PRICE_<TIER>_<MONTHLY|YEARLY>` IDs. |
 | Scheduled jobs | `CRON_SECRET` | Long random secret; both cron endpoints reject unauthenticated requests. Vercel adds `Authorization: Bearer <CRON_SECRET>` automatically. |
 | Browser push | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Generate a VAPID key pair (e.g. `npx web-push generate-vapid-keys`); subject must be `mailto:ops@example.com` or an HTTPS URL. Do not expose the private key. Requires HTTPS and browser permission. |
+
+If Settings displays “model missing” on a Preview deployment despite a value in Vercel, check that `GROQ_MODEL` is assigned to **Preview** and applies to the specific Git branch (not only Production or a different branch), then **redeploy**. The Settings status reports presence only; it never exposes keys or model IDs. `GROQ_MODEL` is server-side (do not prefix it with `NEXT_PUBLIC_`).
 
 Do **not** enable `DEMO_MODE` or `NEXT_PUBLIC_DEMO_MODE` on Vercel. Service-specific features return a configuration error when their keys are missing, rather than fake data. Check `ENVIRONMENT.md` for more details.
 
