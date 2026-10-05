@@ -33,6 +33,11 @@ export default function CopilotScreen() {
   async function sendMessage(text?: string) {
     const msg = (text ?? input).trim();
     if (!msg || loading) return;
+    const groqModel = process.env.EXPO_PUBLIC_GROQ_MODEL;
+    if (!groqModel) {
+      setMessages(prev => [...prev, { id: Date.now().toString(), role: "assistant", content: "AI is not configured. Set EXPO_PUBLIC_GROQ_MODEL." }]);
+      return;
+    }
     setInput("");
     const userMsg: Message = { id: Date.now().toString(), role: "user", content: msg };
     setMessages(prev => [...prev, userMsg]);
@@ -45,7 +50,7 @@ export default function CopilotScreen() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "llama-3.1-70b-versatile",
+          model: groqModel,
           messages: [
             { role: "system", content: "You are HireFlow AI Copilot, a career assistant. Be concise, actionable, and data-driven." },
             ...messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
@@ -100,7 +105,7 @@ export default function CopilotScreen() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "llama-3.1-70b-versatile",
+            model: groqModel,
             messages: [
               { role: "system", content: "You are HireFlow AI Copilot, a career assistant. Be concise, actionable, and data-driven." },
               { role: "user", content: msg },

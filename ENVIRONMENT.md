@@ -18,6 +18,7 @@
 | Variable | Type | Description | How to Obtain |
 |----------|------|-------------|---------------|
 | `GROQ_API_KEY` | String | Groq AI API key | console.groq.com/keys |
+| `GROQ_MODEL` | String | Groq model id (no default in code) | console.groq.com/docs/models |
 
 ### Google Integration
 | Variable | Type | Description | How to Obtain |
@@ -60,6 +61,7 @@ NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
 
 # AI
 GROQ_API_KEY=gsk_xxx
+GROQ_MODEL=
 
 # Google
 GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com

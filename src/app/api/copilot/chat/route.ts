@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { gatherContext } from "@/lib/copilot/context";
 import { buildSystemPrompt, buildUserMessage } from "@/lib/copilot/prompt";
 import { TOOL_DEFINITIONS, executeTool } from "@/lib/copilot/tools";
-import { GROQ_API_URL, GROQ_MODEL } from "@/lib/ai-config";
+import { GROQ_API_URL, getGroqModel } from "@/lib/ai-config";
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -14,6 +14,12 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey || apiKey === "placeholder") {
     return new Response(JSON.stringify({ error: "AI service not configured. Set GROQ_API_KEY." }), { status: 500 });
+  }
+  let groqModel: string;
+  try {
+    groqModel = getGroqModel();
+  } catch {
+    return new Response(JSON.stringify({ error: "AI service not configured. Set GROQ_MODEL." }), { status: 500 });
   }
 
   try {
@@ -51,7 +57,7 @@ export async function POST(req: NextRequest) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: GROQ_MODEL,
+        model: groqModel,
         messages: groqMessages,
         tools: TOOL_DEFINITIONS.map(t => ({
           type: "function",
@@ -172,7 +178,7 @@ export async function POST(req: NextRequest) {
               method: "POST",
               headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
               body: JSON.stringify({
-                model: GROQ_MODEL,
+                model: groqModel,
                 messages: groqMessages,
                 temperature: 0.3,
                 max_tokens: 2048,

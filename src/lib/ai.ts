@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GROQ_API_URL, GROQ_MODEL } from "@/lib/ai-config";
+import { GROQ_API_URL, getGroqModel } from "@/lib/ai-config";
 
 async function groqChat(systemPrompt: string, userMessage: string): Promise<string> {
   const response = await fetch(GROQ_API_URL, {
@@ -9,7 +9,7 @@ async function groqChat(systemPrompt: string, userMessage: string): Promise<stri
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: GROQ_MODEL,
+      model: getGroqModel(),
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },

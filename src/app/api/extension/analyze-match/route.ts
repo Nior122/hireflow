@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { GROQ_API_URL, getGroqModel } from "@/lib/ai-config";
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -23,11 +24,11 @@ export async function POST(req: NextRequest) {
     });
     const resumeText = app?.notes ?? "No resume text available";
 
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const response = await fetch(GROQ_API_URL, {
       method: "POST",
       headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "llama-3.1-70b-versatile",
+        model: getGroqModel(),
         messages: [
           { role: "system", content: "Compare a resume to a job description. Return JSON: { matchPercentage: 0-100, missingSkills: [], improvements: [] }" },
           { role: "user", content: `Resume:\n${resumeText.slice(0, 3000)}\n\nJob: ${jobTitle}\nDescription:\n${jobDescription.slice(0, 3000)}` },

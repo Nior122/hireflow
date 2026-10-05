@@ -3,7 +3,7 @@
  * Allows switching between Groq, OpenAI, Anthropic, etc.
  */
 
-import { GROQ_API_URL, GROQ_MODEL } from "@/lib/ai-config";
+import { GROQ_API_URL, getGroqModel } from "@/lib/ai-config";
 
 export interface AIProvider {
   id: string;
@@ -38,7 +38,7 @@ export class GroqProvider implements AIProvider {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: options?.model ?? GROQ_MODEL,
+        model: getGroqModel(options?.model),
         messages,
         temperature: options?.temperature ?? 0.3,
         max_tokens: options?.maxTokens ?? 2048,
@@ -62,7 +62,7 @@ export class GroqProvider implements AIProvider {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: options?.model ?? GROQ_MODEL,
+        model: getGroqModel(options?.model),
         messages,
         temperature: options?.temperature ?? 0.3,
         max_tokens: options?.maxTokens ?? 2048,

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { GROQ_API_URL, GROQ_MODEL } from "@/lib/ai-config";
+import { GROQ_API_URL, getGroqModel } from "@/lib/ai-config";
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -9,6 +9,11 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey || apiKey === "placeholder") {
     return Response.json({ error: "AI not configured" }, { status: 500 });
+  }
+  try {
+    getGroqModel();
+  } catch {
+    return Response.json({ error: "AI not configured. Set GROQ_MODEL." }, { status: 500 });
   }
 
   try {
@@ -69,7 +74,7 @@ On final response, provide full evaluation.`,
       method: "POST",
       headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: GROQ_MODEL,
+        model: getGroqModel(),
         messages: [
           { role: "system", content: prompt.system },
           { role: "user", content: prompt.user },

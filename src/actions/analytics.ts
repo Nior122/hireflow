@@ -7,6 +7,7 @@ import {
   getRecruiterPerformance, generateAiInsights, getCandidateScores,
 } from "@/lib/analytics/aggregation";
 import type { ActionResponse } from "@/lib/types";
+import { GROQ_API_URL, getGroqModel } from "@/lib/ai-config";
 
 // ─── Executive Dashboard ───────────────────────────────────────
 
@@ -108,11 +109,11 @@ export async function generateReport(orgId?: string): Promise<ActionResponse<str
     }
 
     try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const res = await fetch(GROQ_API_URL, {
         method: "POST",
         headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "llama-3.1-70b-versatile",
+          model: getGroqModel(),
           messages: [
             { role: "system", content: "You are an expert HR analyst. Generate a professional quarterly hiring report in markdown. Include executive summary, key metrics, trends, insights, and recommendations." },
             { role: "user", content: `Generate a hiring report based on this data:\n\nMetrics: ${JSON.stringify(metrics)}\nFunnel: ${JSON.stringify(funnel)}\nSources: ${JSON.stringify(sources)}\nInsights: ${JSON.stringify(insights.map((i: { title: string; description: string }) => ({ title: i.title, description: i.description })))}` },
