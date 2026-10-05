@@ -10,7 +10,7 @@ export async function getJobWorkspace(jobId: string): Promise<ActionResponse<any
     const user = await createOrGetUser();
     
     // Attempt to fetch JobApplication
-    let job = await prisma.jobApplication.findUnique({
+    const job = await prisma.jobApplication.findUnique({
       where: { id: jobId },
       include: {
         resumes: { orderBy: { updatedAt: 'desc' } },
@@ -28,7 +28,7 @@ export async function getJobWorkspace(jobId: string): Promise<ActionResponse<any
     }
 
     // Fetch related emails if sourceEmailId is present
-    let emails: any[] = [];
+    const emails: any[] = [];
     if (job.sourceEmailId) {
       const sourceEmail = await prisma.emailMessage.findUnique({
         where: { id: job.sourceEmailId }

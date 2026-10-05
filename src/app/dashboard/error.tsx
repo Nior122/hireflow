@@ -25,7 +25,7 @@ export default function DashboardError({
         </div>
         <h2 className="text-2xl font-bold tracking-tight mb-3">Something went wrong</h2>
         <p className="text-muted-foreground mb-6 text-sm leading-relaxed">
-          An unexpected error occurred while loading your dashboard view. We've logged this issue.
+          An unexpected error occurred while loading your dashboard view. We&apos;ve logged this issue.
         </p>
         
         {error.digest && (
