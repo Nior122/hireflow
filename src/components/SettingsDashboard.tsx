@@ -18,7 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getAiConfigurationStatus, getAvailableAiModels } from "@/actions/ai-status";
+import { getAiConfigurationStatus, getAvailableAiModels, testAiConnection } from "@/actions/ai-status";
 import { subscribeToReminders, unsubscribeFromReminders } from "@/lib/reminder-subscribe";
 import { checkout } from "@/actions/billing";
 import { getReminderPreferences, setReminderPreferences } from "@/actions/reminders";
@@ -35,6 +35,8 @@ export function SettingsDashboard() {
   } | null>(null);
   
   const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [testingAi, setTestingAi] = useState(false);
+  const [aiTestResult, setAiTestResult] = useState<{ok:boolean;message:string} | null>(null);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [aiStatus, setAiStatus] = useState<Awaited<ReturnType<typeof getAiConfigurationStatus>> | null>(null);
   useEffect(() => {
@@ -252,6 +254,15 @@ export function SettingsDashboard() {
                 <ul className="grid gap-2 sm:grid-cols-2 text-sm">
                   {availableModels.map(id => <li key={id} className="rounded border px-3 py-2 break-all">{id}{aiStatus?.model === id && <span className="ml-2 text-emerald-600">Active</span>}</li>)}
                 </ul>
+              </div>
+              <div className="space-y-2">
+                <Button type="button" disabled={testingAi} onClick={async () => {
+                  setTestingAi(true); setAiTestResult(null);
+                  try { setAiTestResult(await testAiConnection()); }
+                  catch { setAiTestResult({ ok: false, message: 'Could not test AI connection.' }); }
+                  finally { setTestingAi(false); }
+                }}>{testingAi ? 'Testing live response…' : 'Test AI connection'}</Button>
+                {aiTestResult && <p role="status" className={aiTestResult.ok ? 'text-sm text-emerald-600' : 'text-sm text-destructive'}>{aiTestResult.message}</p>}
               </div>
               <Button type="button" variant="outline" onClick={async () => {
                 try {

@@ -111,7 +111,7 @@ export async function groqFetch(
   let config;
   try { config = getAiConfig(); }
   catch (e) {
-    if (process.env.DEMO_MODE === "true") return demoResponse(payload);
+    if (process.env.DEMO_MODE === "true" && process.env.NODE_ENV !== "production") return demoResponse(payload);
     return Response.json({ error: e instanceof Error ? e.message : 'AI provider is not configured' }, { status: 503 });
   }
 

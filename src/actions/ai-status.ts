@@ -41,3 +41,22 @@ export async function getAvailableAiModels(): Promise<{ models: string[]; error?
     return { models };
   } catch { return { models: [], error: 'Provider model lookup timed out or is unavailable.' }; }
 }
+
+/** Real, small completion through the same transport used by Copilot and resume AI. */
+export async function testAiConnection(): Promise<{ ok: boolean; message: string }> {
+  await createOrGetUser();
+  const { getAiConfig } = await import('@/lib/ai-config');
+  const { groqChatJson } = await import('@/lib/ai/groq');
+  try {
+    const config = getAiConfig();
+    const reply = await groqChatJson({
+      messages: [{ role: 'user', content: 'Reply with the single word READY.' }],
+      max_tokens: 12, temperature: 0,
+    });
+    if (!reply.ok) return { ok: false, message: `${config.provider} request failed (HTTP ${reply.status}): ${reply.error ?? 'Unknown provider error'}`.slice(0, 300) };
+    if (!reply.content.trim()) return { ok: false, message: `${config.provider} returned an empty reply. Check the model's chat-completion support.` };
+    return { ok: true, message: `${config.provider} responded using ${config.model}.` };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'AI connection test failed' };
+  }
+}
