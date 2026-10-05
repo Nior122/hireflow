@@ -18,7 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getAiConfigurationStatus, getAvailableGroqModels } from "@/actions/ai-status";
+import { getAiConfigurationStatus, getAvailableAiModels } from "@/actions/ai-status";
 import { subscribeToReminders, unsubscribeFromReminders } from "@/lib/reminder-subscribe";
 import { checkout } from "@/actions/billing";
 import { getReminderPreferences, setReminderPreferences } from "@/actions/reminders";
@@ -39,7 +39,7 @@ export function SettingsDashboard() {
   const [aiStatus, setAiStatus] = useState<Awaited<ReturnType<typeof getAiConfigurationStatus>> | null>(null);
   useEffect(() => {
     getAiConfigurationStatus().then(setAiStatus).catch(() => {});
-    getAvailableGroqModels().then(result => { setAvailableModels(result.models); setModelsError(result.error ?? null); }).catch(() => setModelsError('Unable to load Groq models.'));
+    getAvailableAiModels().then(result => { setAvailableModels(result.models); setModelsError(result.error ?? null); }).catch(() => setModelsError('Unable to load provider models.'));
   }, []);
   const [remindersEnabled, setRemindersEnabled] = useState(false);
   useEffect(() => { getReminderPreferences().then(p => setRemindersEnabled(p.enabled)); }, []);
@@ -88,9 +88,9 @@ export function SettingsDashboard() {
       </div>
 
       {aiStatus && <div className="rounded-lg border p-3 text-sm" role="status">
-        <strong>AI runtime status:</strong> Groq key {aiStatus.keyConfigured ? 'available' : 'missing'}; model {aiStatus.modelConfigured ? 'available' : 'missing'}
+        <strong>AI runtime status:</strong> provider key {aiStatus.keyConfigured ? 'available' : 'missing'}; model {aiStatus.modelConfigured ? 'available' : 'missing'}
         {' '}in {aiStatus.environment}{aiStatus.deployment ? ` (deploy ${aiStatus.deployment})` : ''}.
-        {!aiStatus.modelConfigured && <p className="text-muted-foreground mt-1">Set GROQ_MODEL for this Vercel environment and branch, then redeploy. Values are never displayed here.</p>}
+        {!aiStatus.modelConfigured && <p className="text-muted-foreground mt-1">{aiStatus.error ?? "Configure an AI provider and model in Vercel."} Redeploy after changing Vercel variables.</p>}
         <Button type="button" variant="ghost" size="sm" className="ml-2" onClick={() => getAiConfigurationStatus().then(setAiStatus).catch(() => toast.error('Cannot check AI configuration'))}>Refresh</Button>
       </div>}
       <Tabs defaultValue="profile" className="space-y-6">
@@ -103,7 +103,7 @@ export function SettingsDashboard() {
               <LinkIcon className="h-4 w-4" /> Integrations
             </TabsTrigger>
             <TabsTrigger value="ai" className="gap-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              <Brain className="h-4 w-4" /> AI & Groq
+              <Brain className="h-4 w-4" /> AI Provider
             </TabsTrigger>
             <TabsTrigger value="billing" className="gap-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <CreditCard className="h-4 w-4" /> Billing
@@ -237,16 +237,16 @@ export function SettingsDashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm">Groq credentials are configured in Vercel, not entered or stored in this page.</p>
+              <p className="text-sm">AI provider credentials are configured in Vercel, not entered or stored in this page.</p>
               <div className="rounded-lg border p-4 text-sm space-y-2" role="status">
-                <p>API key: <strong>{aiStatus?.keyConfigured ? 'Available to server' : 'Not available to this deployment'}</strong></p>
-                <p>Active model from <code>GROQ_MODEL</code>: <strong>{aiStatus?.model ?? 'Not available to this deployment'}</strong></p>
+                <p>Provider: <strong>{aiStatus?.provider ?? "Checking…"}</strong> · API key: <strong>{aiStatus?.keyConfigured ? 'Available to server' : 'Not available to this deployment'}</strong></p>
+                <p>Active model from the server environment: <strong>{aiStatus?.model ?? 'Not available to this deployment'}</strong></p>
                 {aiStatus && <p className="text-muted-foreground">Environment: {aiStatus.environment}{aiStatus.deployment ? ` · deploy ${aiStatus.deployment}` : ''}</p>}
-                {!aiStatus?.modelConfigured && <p className="text-amber-600">The running server cannot read GROQ_MODEL. Check Vercel Preview/Production and branch scope, then redeploy after updating it.</p>}
+                {!aiStatus?.modelConfigured && <p className="text-amber-600">{aiStatus?.error ?? "AI is not configured."} Check Vercel Preview/Production and branch scope, then redeploy.</p>}
               </div>
               <div className="rounded-lg border p-4 space-y-2">
-                <h4 className="font-medium text-sm">Models available from your Groq account</h4>
-                <p className="text-xs text-muted-foreground">Live list from Groq; availability does not select a model. The server uses only the GROQ_MODEL environment variable.</p>
+                <h4 className="font-medium text-sm">Models available from the configured provider</h4>
+                <p className="text-xs text-muted-foreground">Live list from the provider; the server uses the selected provider and model from environment variables, never a model picked by this page.</p>
                 {modelsError && <p className="text-sm text-destructive">{modelsError}</p>}
                 {!modelsError && !availableModels.length && <p className="text-sm text-muted-foreground">No models returned yet.</p>}
                 <ul className="grid gap-2 sm:grid-cols-2 text-sm">
@@ -255,10 +255,10 @@ export function SettingsDashboard() {
               </div>
               <Button type="button" variant="outline" onClick={async () => {
                 try {
-                  const [status, result] = await Promise.all([getAiConfigurationStatus(), getAvailableGroqModels()]);
+                  const [status, result] = await Promise.all([getAiConfigurationStatus(), getAvailableAiModels()]);
                   setAiStatus(status); setAvailableModels(result.models); setModelsError(result.error ?? null);
-                } catch { toast.error('Unable to refresh Groq status.'); }
-              }}>Refresh Groq status</Button>
+                } catch { toast.error('Unable to refresh AI status.'); }
+              }}>Refresh AI status</Button>
             </CardContent>
           </Card>
         </TabsContent>

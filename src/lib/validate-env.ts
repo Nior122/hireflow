@@ -9,11 +9,11 @@ const REQUIRED_VARS = [
 ] as const;
 
 const OPTIONAL_BUT_RECOMMENDED = [
-  "GROQ_API_KEY",
-  "GROQ_MODEL",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
 ] as const;
+
+import { getAiConfig } from "@/lib/ai-config";
 
 interface ValidationResult {
   ok: boolean;
@@ -38,6 +38,9 @@ export function validateEnv(): ValidationResult {
       warnings.push(v);
     }
   }
+
+  try { getAiConfig(); }
+  catch (error) { warnings.push(error instanceof Error ? `AI: ${error.message}` : 'AI is not configured'); }
 
   return {
     ok: missing.length === 0,

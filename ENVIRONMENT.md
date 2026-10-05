@@ -18,7 +18,12 @@
 | Variable | Type | Description | How to Obtain |
 |----------|------|-------------|---------------|
 | `GROQ_API_KEY` | String | Groq AI API key | console.groq.com/keys |
-| `GROQ_MODEL` | String | Groq model id (no default in code) | console.groq.com/docs/models |
+| `GROQ_MODEL` | String | Groq model ID (no default in code) | console.groq.com/docs/models |
+| `AI_PROVIDER` | String | Select `groq`, `openrouter`, `openai`, or `custom`; required when multiple keys exist | Vercel environment |
+| `AI_MODEL` | String | Preferred model ID, overrides provider-specific model variable | Provider models API |
+| `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | String | OpenRouter-compatible chat API | openrouter.ai |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | String | OpenAI-compatible chat API | platform.openai.com |
+| `AI_API_KEY` / `AI_BASE_URL` | String | Custom HTTPS OpenAI-compatible `/v1` provider (requires `AI_PROVIDER=custom`) | Your provider |
 
 ### Google Integration
 | Variable | Type | Description | How to Obtain |

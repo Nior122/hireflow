@@ -24,9 +24,9 @@ export interface ChatOptions {
   maxTokens?: number;
 }
 
-export class GroqProvider implements AIProvider {
-  id = "groq";
-  name = "Groq";
+export class OpenAICompatibleProvider implements AIProvider {
+  id = "configured";
+  name = "Configured AI provider";
 
   async chat(messages: ChatMessage[], options?: ChatOptions): Promise<string> {
     const response = await groqFetch({
@@ -36,7 +36,7 @@ export class GroqProvider implements AIProvider {
       max_tokens: options?.maxTokens ?? 2048,
     });
 
-    if (!response.ok) throw new Error(`Groq API error: ${response.status}`);
+    if (!response.ok) throw new Error(`AI provider error: ${response.status}`);
     const data = await response.json();
     return plainGroqReply(data.choices?.[0]?.message?.content ?? "");
   }
@@ -50,7 +50,7 @@ export class GroqProvider implements AIProvider {
       stream: true,
     });
 
-    if (!response.ok) throw new Error(`Groq API error: ${response.status}`);
+    if (!response.ok) throw new Error(`AI provider error: ${response.status}`);
 
     const reader = response.body?.getReader();
     if (!reader) return;
@@ -89,10 +89,13 @@ export function registerProvider(provider: AIProvider) {
 }
 
 export function getProvider(id?: string): AIProvider {
-  const providerId = id ?? "groq";
+  const providerId = id ?? "configured";
   const provider = providers.get(providerId);
   if (!provider) throw new Error(`AI provider ${providerId} not registered`);
   return provider;
 }
 
-registerProvider(new GroqProvider());
+registerProvider(new OpenAICompatibleProvider());
+
+/** Backwards-compatible alias used by existing extraction code. */
+export { OpenAICompatibleProvider as GroqProvider };

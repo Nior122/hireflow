@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   if (!user) return Response.json({ error: "Please sign in to use AI." }, { status: 401 });
 
   if (!getGroqApiKey() && process.env.DEMO_MODE !== "true") {
-    return Response.json({ error: "AI is not configured. Set GROQ_API_KEY." }, { status: 500 });
+    return Response.json({ error: "AI provider is not configured. Check AI settings and Vercel environment variables." }, { status: 500 });
   }
 
   try {

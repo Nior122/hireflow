@@ -1,43 +1,43 @@
 'use server';
 
 import { createOrGetUser } from '@/lib/clerk';
-import { getGroqApiKey } from '@/lib/ai/groq';
-import { getGroqModel } from '@/lib/ai-config';
+import { getAiConnection, getAiConfigurationStatus as readConfiguration } from '@/lib/ai-config';
 
-/** Safe runtime diagnostics; never return credentials. Model IDs are public identifiers. */
+/** Safe runtime diagnostics: no credentials returned. */
 export async function getAiConfigurationStatus() {
   await createOrGetUser();
-  let model: string | null = null;
-  try { model = getGroqModel(); } catch { /* missing at runtime */ }
+  const status = readConfiguration();
   return {
-    keyConfigured: Boolean(getGroqApiKey()),
-    modelConfigured: Boolean(model),
-    model,
+    keyConfigured: (() => { try { return Boolean(getAiConnection().apiKey); } catch { return false; } })(),
+    modelConfigured: status.configured,
+    model: status.model,
+    provider: status.provider,
+    error: status.error,
     environment: process.env.VERCEL_ENV ?? 'local',
     deployment: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
   };
 }
 
-/** Fetch actual account-accessible models from Groq, not a static marketing list. */
-export async function getAvailableGroqModels(): Promise<{ models: string[]; error?: string }> {
+/** Live models available to the configured provider key, never fake marketing cards. */
+export async function getAvailableAiModels(): Promise<{ models: string[]; error?: string }> {
   await createOrGetUser();
-  const key = getGroqApiKey();
-  if (!key) return { models: [], error: 'GROQ_API_KEY is unavailable on this deployment.' };
+  let config;
+  try { config = getAiConnection(); }
+  catch (e) { return { models: [], error: e instanceof Error ? e.message : 'AI is not configured' }; }
   try {
-    const response = await fetch('https://api.groq.com/openai/v1/models', {
-      headers: { Authorization: `Bearer ${key}` },
+    const response = await fetch(`${config.baseUrl}/models`, {
+      headers: { Authorization: `Bearer ${config.apiKey}` },
       signal: AbortSignal.timeout(10000), cache: 'no-store',
     });
-    if (!response.ok) return { models: [], error: `Groq model lookup failed (HTTP ${response.status}).` };
+    if (!response.ok) return { models: [], error: `Model lookup failed (HTTP ${response.status}).` };
     const data: unknown = await response.json();
     if (!data || typeof data !== 'object' || !('data' in data) || !Array.isArray(data.data))
-      return { models: [], error: 'Groq returned an unexpected model list.' };
+      return { models: [], error: 'Provider returned an unexpected model list.' };
     const models = data.data
       .filter((item: unknown): item is { id: string; active?: boolean } => !!item && typeof item === 'object' &&
         'id' in item && typeof item.id === 'string' && item.id.length < 150 &&
         (!('active' in item) || item.active !== false))
-      .map((item: { id: string }) => item.id)
-      .sort();
+      .map((item: { id: string }) => item.id).sort();
     return { models };
-  } catch { return { models: [], error: 'Groq model lookup timed out or is unavailable.' }; }
+  } catch { return { models: [], error: 'Provider model lookup timed out or is unavailable.' }; }
 }

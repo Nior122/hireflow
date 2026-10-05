@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   if (!user) return new Response(JSON.stringify({ error: "Please sign in to use Copilot." }), { status: 401 });
 
   if (!getGroqApiKey() && process.env.DEMO_MODE !== "true") {
-    return new Response(JSON.stringify({ error: "AI is not configured. Set GROQ_API_KEY in Vercel environment variables." }), { status: 500 });
+    return new Response(JSON.stringify({ error: "AI provider is not configured. Check AI settings and Vercel environment variables." }), { status: 500 });
   }
 
   try {
