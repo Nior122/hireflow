@@ -17,6 +17,8 @@ Add these variables in Vercel → Project → Settings → Environment Variables
 | Scheduled jobs | `CRON_SECRET` | Long random secret; both cron endpoints reject unauthenticated requests. Vercel adds `Authorization: Bearer <CRON_SECRET>` automatically. |
 | Browser push | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Generate a VAPID key pair (e.g. `npx web-push generate-vapid-keys`); subject must be `mailto:ops@example.com` or an HTTPS URL. Do not expose the private key. Requires HTTPS and browser permission. |
 
+To test the provider end to end from a machine that holds the key, run `npm run ai:check`. It resolves the provider with the same module the app uses, lists the models the key can see, checks the configured model id is among them, and performs one real completion. The key is never printed.
+
 If Settings reports a missing key/model on Preview despite a value in Vercel, check **Preview** scope and branch-specific overrides, then **redeploy**. Settings reports the active provider/model and fetches the live model list from the selected API; it never returns credentials. Multiple provider keys require an explicit `AI_PROVIDER` to avoid silently charging a different service. Model names are not hardcoded.
 
 Do **not** enable `DEMO_MODE` or `NEXT_PUBLIC_DEMO_MODE` on Vercel. Service-specific features return a configuration error when their keys are missing, rather than fake data. Check `ENVIRONMENT.md` for more details.
@@ -24,6 +26,29 @@ Do **not** enable `DEMO_MODE` or `NEXT_PUBLIC_DEMO_MODE` on Vercel. Service-spec
 ## Database setup
 
 `prisma generate` only builds the Prisma client; it does **not** apply schema changes. Before directing production traffic to a new database, back it up, inspect schema changes and use your normal controlled database migration process. This repo contains a targeted Gmail unique-index migration, **not** a full baseline migration. On an existing HireFlow database, verify the schema is already current and remove duplicate `(userId,gmailMessageId)` rows before applying that index. Do not blindly run `prisma migrate deploy` against a fresh database or `prisma db push` on a production database without reviewing the SQL impact. Uploads and push subscriptions use existing JSON columns (`JobApplication.otherDocuments`, `User.notificationPrefs`) and need no new columns.
+
+## Confirm which build a URL is actually serving
+
+Merging a PR and seeing a green Preview deployment does **not** guarantee the page in your browser is that build. Two things keep old builds in front of users:
+
+1. **Pinned deployment URLs.** `https://<project>-<hash>-<scope>.vercel.app` stays live forever and always serves the build it was created from. A bookmark, an emailed link, the browser extension, or a Clerk redirect pointing at one of them shows old UI and old error strings no matter how often `master` is redeployed. Only the production domain moves to the newest build.
+2. **Clerk redirect URLs.** `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` / `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` are compiled into the bundle at build time. If the value used by a Preview (or an older Production build) is an absolute URL for a pinned deployment, signing in walks the browser back to that old build. Keep them relative (`/dashboard`), and keep the Clerk application URL on the production domain.
+
+Check any URL without signing in:
+
+```bash
+curl -s https://<host>/api/health | jq '{deployment, ai: .checks.ai}'
+# {"deployment":{"environment":"production","commit":"<sha>","branch":"master","url":"https://<production-host>"},
+#  "ai":{"status":"configured","provider":"groq","model":"<model id>","error":null}}
+
+git rev-parse origin/master      # compare with deployment.commit
+```
+
+- `deployment.commit` is the `VERCEL_GIT_COMMIT_SHA` of the build answering the request.
+- `checks.ai` is resolved with the same code the app uses: `not_configured` plus an error naming the missing variable (for example `AI_MODEL or GROQ_MODEL is not set for groq`) means the key is present but the model is not. It never returns the key or the endpoint.
+- A build older than PR #2 also 404s on `/reminder-sw.js`, which is a quick smoke test for "is this the new build?".
+
+Settings → **AI** shows the same information for the signed-in user plus the live model list from the provider.
 
 ## After deploy
 

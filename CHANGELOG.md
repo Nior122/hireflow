@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ---
 
+## [Unreleased]
+
+### Added
+- `/api/health` now reports `deployment` (`environment`, `commit`, `branch`, production `url`) so any URL can be identified without signing in.
+- `/api/health` reports a provider-aware `checks.ai` (`status`, `provider`, `model`, `error`) resolved with the same code the app uses. The deprecated `checks.groq` field mirrors it.
+- `npm run ai:check` resolves the configured provider, lists the models the key can see, verifies the configured model id is among them, and performs one real completion. The API key is never printed.
+- Canonical URLs, Open Graph tags and `sitemap.xml` derive from `NEXT_PUBLIC_APP_URL` → `VERCEL_PROJECT_PRODUCTION_URL` → `VERCEL_URL` instead of a hard-coded domain.
+- Browser extension reads its app origin from `VITE_HIREFLOW_APP_URL` instead of a hard-coded URL.
+
+### Fixed
+- `getAiConfigurationStatus()` names the inferred provider even when only its key is set, so a missing model is reported as `AI_MODEL or GROQ_MODEL is not set for groq` against the right provider instead of a generic `auto` status.
+- `/api/debug/dump` required no authentication and returned raw mailbox content for every user. It is now authenticated and disabled on production deployments.
+- Browser extension pointed at `https://hireflow.vercel.app`, which is not this application.
+
 ## [1.0.0] - 2026-07-22
 
 ### Added

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { getAuth, clearAuth, saveJob, analyzeMatch, generateCoverLetter, checkDuplicate } from "../shared/api";
+import { APP_URL } from "../shared/config";
 import type { DetectedJob } from "../shared/types";
 
 type Tab = "save" | "match" | "cover" | "settings";
@@ -26,7 +27,7 @@ export function Popup() {
   }, []);
 
   function handleLogin() {
-    chrome.tabs.create({ url: "https://hireflow.vercel.app/sign-in?redirect=extension" });
+    chrome.tabs.create({ url: `${APP_URL}/sign-in?redirect=extension` });
   }
 
   function handleLogout() {
@@ -168,7 +169,7 @@ export function Popup() {
 
       {/* Footer */}
       <div style={{ padding: "8px 16px", borderTop: "1px solid #e5e7eb", textAlign: "center" }}>
-        <a href="https://hireflow.vercel.app/dashboard" target="_blank" rel="noopener" style={{ fontSize: 11, color: "#2563eb", textDecoration: "none" }}>Open HireFlow Dashboard →</a>
+        <a href={`${APP_URL}/dashboard`} target="_blank" rel="noopener" style={{ fontSize: 11, color: "#2563eb", textDecoration: "none" }}>Open HireFlow Dashboard →</a>
       </div>
     </div>
   );

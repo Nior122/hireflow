@@ -1,3 +1,4 @@
+import { APP_URL } from "../shared/config";
 import { saveJob, analyzeMatch, generateCoverLetter, checkDuplicate, getAuth, syncOfflineQueue } from "../shared/api";
 import type { DetectedJob } from "../shared/types";
 
@@ -65,7 +66,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === "hireflow-save" && tab?.id) {
     chrome.tabs.sendMessage(tab.id, { action: "DETECT_AND_SAVE" });
   } else if (info.menuItemId === "hireflow-open") {
-    chrome.tabs.create({ url: "https://hireflow.vercel.app/dashboard" });
+    chrome.tabs.create({ url: `${APP_URL}/dashboard` });
   }
 });
 
