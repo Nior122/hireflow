@@ -1,5 +1,6 @@
 'use server';
 
+import { prismaJson } from "@/lib/prisma-json";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { createOrGetUser } from "@/lib/clerk";
@@ -61,7 +62,7 @@ export async function setReminderPreferences(enabled: boolean): Promise<void> {
   const user = await createOrGetUser();
   const { parseNotificationPrefs } = await import('@/lib/reminder-push');
   const previous = parseNotificationPrefs(user.notificationPrefs);
-  await prisma.user.update({ where: { id: user.id }, data: { notificationPrefs: { ...previous, interviewReminders: enabled, subscriptions: enabled ? previous.subscriptions : [] } } });
+  await prisma.user.update({ where: { id: user.id }, data: { notificationPrefs: prismaJson({ ...previous, interviewReminders: enabled, subscriptions: enabled ? previous.subscriptions : [] }) } });
 }
 
 export async function saveReminderPushSubscription(subscription: unknown): Promise<void> {
@@ -71,7 +72,7 @@ export async function saveReminderPushSubscription(subscription: unknown): Promi
   const prefs = parseNotificationPrefs(user.notificationPrefs);
   if (!prefs.interviewReminders) throw new Error('Enable reminders first');
   await prisma.user.update({ where: { id: user.id }, data: {
-    notificationPrefs: { ...prefs, subscriptions: [...(prefs.subscriptions ?? []).filter(s => s.endpoint !== subscription.endpoint), subscription].slice(-5) },
+    notificationPrefs: prismaJson({ ...prefs, subscriptions: [...(prefs.subscriptions ?? []).filter(s => s.endpoint !== subscription.endpoint), subscription].slice(-5) }),
   } });
 }
 
@@ -80,6 +81,6 @@ export async function removeReminderPushSubscription(endpoint: string): Promise<
   const user = await createOrGetUser();
   const prefs = parseNotificationPrefs(user.notificationPrefs);
   await prisma.user.update({ where: { id: user.id }, data: {
-    notificationPrefs: { ...prefs, subscriptions: (prefs.subscriptions ?? []).filter(s => s.endpoint !== endpoint) },
+    notificationPrefs: prismaJson({ ...prefs, subscriptions: (prefs.subscriptions ?? []).filter(s => s.endpoint !== endpoint) }),
   } });
 }

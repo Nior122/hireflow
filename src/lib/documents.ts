@@ -1,4 +1,12 @@
-export interface StoredDocument { id: string; name: string; mime: string; size: number; base64: string; }
+export interface StoredDocument {
+  // Prisma's JSON input expects an indexable object. Keep document values JSON primitives.
+  [key: string]: string | number;
+  id: string;
+  name: string;
+  mime: string;
+  size: number;
+  base64: string;
+}
 export const MAX_DOCUMENT_SIZE = 1_500_000;
 const allowed = new Set(['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain', 'image/png', 'image/jpeg', 'image/webp']);
 export function validateDocument(name: string, mime: string, bytes: Uint8Array): void {

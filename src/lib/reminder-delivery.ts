@@ -1,3 +1,4 @@
+import { prismaJson } from '@/lib/prisma-json';
 import { prisma } from '@/lib/prisma';
 import { parseNotificationPrefs } from '@/lib/reminder-push';
 
@@ -28,10 +29,10 @@ export async function deliverUpcomingReminders(now = new Date()) {
       }
     }
     if (delivered || valid.length !== prefs.subscriptions.length) {
-      await prisma.user.update({ where: { id: reminder.userId }, data: { notificationPrefs: {
+      await prisma.user.update({ where: { id: reminder.userId }, data: { notificationPrefs: prismaJson({
         ...prefs, subscriptions: valid,
         sentReminderIds: delivered ? [...(prefs.sentReminderIds ?? []), reminder.id].slice(-500) : prefs.sentReminderIds,
-      } } });
+      }) } });
     }
   }
   return { sent, checked: reminders.length };
