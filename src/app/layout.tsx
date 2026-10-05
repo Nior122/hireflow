@@ -74,6 +74,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   const envBanner = process.env.NODE_ENV !== "production" ? getEnvStatusHtml() : "";
 
+  const demo = process.env.DEMO_MODE === "true";
+  const inner = (
+    <>
+      {envBanner && (
+        <div dangerouslySetInnerHTML={{ __html: envBanner }} />
+      )}
+      <Providers>{children}</Providers>
+    </>
+  );
+
   return (
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <head>
@@ -90,12 +100,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <ClerkProvider>
-          {envBanner && (
-            <div dangerouslySetInnerHTML={{ __html: envBanner }} />
-          )}
-          <Providers>{children}</Providers>
-        </ClerkProvider>
+        {demo ? inner : <ClerkProvider>{inner}</ClerkProvider>}
       </body>
     </html>
   );

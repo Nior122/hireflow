@@ -183,15 +183,19 @@ export function Header() {
             </Button>
           </Link>
           <div className="ml-1 pl-3 border-l">
-            <UserButton appearance={{ elements: { avatarBox: "w-8 h-8 ring-2 ring-background border shadow-sm transition-transform hover:scale-105" } }}>
-              <UserButton.MenuItems>
-                <UserButton.Link
-                  label="Settings"
-                  labelIcon={<Settings className="h-4 w-4" />}
-                  href="/dashboard/settings"
-                />
-              </UserButton.MenuItems>
-            </UserButton>
+            {process.env.NEXT_PUBLIC_DEMO_MODE === "true" ? (
+              <span className="text-xs text-muted-foreground px-2">Demo</span>
+            ) : (
+              <UserButton appearance={{ elements: { avatarBox: "w-8 h-8 ring-2 ring-background border shadow-sm transition-transform hover:scale-105" } }}>
+                <UserButton.MenuItems>
+                  <UserButton.Link
+                    label="Settings"
+                    labelIcon={<Settings className="h-4 w-4" />}
+                    href="/dashboard/settings"
+                  />
+                </UserButton.MenuItems>
+              </UserButton>
+            )}
           </div>
         </div>
       </div>

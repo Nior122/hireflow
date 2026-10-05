@@ -5,6 +5,7 @@ import { Briefcase, Users, ArrowRight, Sparkles, Zap, Shield, BarChart3 } from "
 import { Button } from "@/components/ui/button";
 
 export default async function HomePage() {
+  if (process.env.DEMO_MODE === "true") redirect("/dashboard");
   const { userId } = await auth();
   if (userId) redirect("/dashboard");
 
