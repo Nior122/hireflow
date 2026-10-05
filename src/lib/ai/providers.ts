@@ -3,6 +3,8 @@
  * Allows switching between Groq, OpenAI, Anthropic, etc.
  */
 
+import { GROQ_API_URL, GROQ_MODEL } from "@/lib/ai-config";
+
 export interface AIProvider {
   id: string;
   name: string;
@@ -20,9 +22,6 @@ export interface ChatOptions {
   temperature?: number;
   maxTokens?: number;
 }
-
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama3-8b-8192";
 
 export class GroqProvider implements AIProvider {
   id = "groq";
@@ -44,6 +43,7 @@ export class GroqProvider implements AIProvider {
         temperature: options?.temperature ?? 0.3,
         max_tokens: options?.maxTokens ?? 2048,
       }),
+      signal: AbortSignal.timeout(12_000),
     });
 
     if (!response.ok) throw new Error(`Groq API error: ${response.status}`);

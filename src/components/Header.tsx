@@ -6,7 +6,7 @@ import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { ThemeToggle } from "./ThemeToggle";
 import { GlobalSearch } from "./GlobalSearch";
-import { Zap, Bell, CalendarClock, Check, Search, LayoutGrid, Bot, FileText, Video, BarChart3, Settings, Menu } from "lucide-react";
+import { Zap, Bell, CalendarClock, Check, Search, LayoutGrid, Bot, FileText, Video, BarChart3, Settings, Menu, Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -39,6 +39,7 @@ export function Header() {
 
   const navLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutGrid, active: pathname === "/dashboard" },
+    { href: "/dashboard/inbox", label: "Inbox", icon: Inbox, active: pathname?.startsWith("/dashboard/inbox") },
     { href: "/dashboard/discover", label: "Job Discovery", icon: Search, active: pathname?.startsWith("/dashboard/discover") },
     { href: "/dashboard/copilot", label: "AI Copilot", icon: Bot, active: pathname?.startsWith("/dashboard/copilot") },
     { href: "/dashboard/resume", label: "Resume Studio", icon: FileText, active: pathname?.startsWith("/dashboard/resume") },

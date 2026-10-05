@@ -84,7 +84,7 @@ export async function scanInbox(): Promise<{ success: boolean; data?: GmailMessa
     const accessToken = await getValidAccessToken(user.id);
     if (!accessToken) return { success: false, error: "Gmail not connected. Please connect your Gmail first." };
 
-    const response = await fetch("https://www.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=20", {
+    const response = await fetch("https://www.googleapis.com/gmail/v1/users/me/messages?q=in:inbox&maxResults=50", {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 

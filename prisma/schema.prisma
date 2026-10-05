@@ -736,7 +736,7 @@ model EmailMessage {
   id                 String          @id @default(cuid())
   userId             String
   user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  gmailMessageId     String          @unique
+  gmailMessageId     String
   gmailThreadId      String?
   sender             String?
   senderEmail        String?
@@ -765,6 +765,7 @@ model EmailMessage {
   updatedAt          DateTime        @updatedAt
   discoveredJobs     DiscoveredJob[]
 
+  @@unique([userId, gmailMessageId])
   @@index([userId])
   @@index([category])
 }

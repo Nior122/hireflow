@@ -47,7 +47,7 @@ export function SettingsDashboard() {
   const handleSync = () => {
     startSync(async () => {
       try {
-        const result = await syncGmailInbox();
+        const result = await syncGmailInbox({ forceFullSync: (gmailStatus?.emailCount ?? 0) === 0 });
         if (result.success) {
           toast.success(`Synced! Processed ${result.data?.emailsProcessed ?? 0} emails, found ${result.data?.jobsDiscovered ?? 0} jobs.`);
           // Refresh Gmail status

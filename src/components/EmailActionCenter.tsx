@@ -71,7 +71,7 @@ export function EmailActionCenter() {
   const handleSync = () => {
     startSync(async () => {
       try {
-        const result = await syncGmailInbox();
+        const result = await syncGmailInbox({ forceFullSync: emails.length === 0 });
         if (result.success) {
           toast.success(`Synced successfully! Processed ${result.data?.emailsProcessed ?? 0} emails.`);
           loadData();
