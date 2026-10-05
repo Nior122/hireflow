@@ -58,7 +58,7 @@ describe("groq helpers", () => {
 });
 
 describe('provider transport', () => {
-  const keys = ['AI_PROVIDER','AI_API_KEY','AI_MODEL','GROQ_API_KEY','GROQ_MODEL','OPENAI_API_KEY','OPENAI_MODEL','OPENROUTER_API_KEY','OPENROUTER_MODEL'] as const;
+  const keys = ['AI_PROVIDER','AI_API_KEY','AI_MODEL','AI_BASE_URL','GROQ_API_KEY','GROQ_MODEL','OPENAI_API_KEY','OPENAI_MODEL','OPENROUTER_API_KEY','OPENROUTER_MODEL'] as const;
   const previous = Object.fromEntries(keys.map(v => [v, process.env[v]]));
   const fetchBefore = global.fetch;
   beforeEach(() => { for (const k of keys) delete process.env[k]; });
@@ -67,8 +67,10 @@ describe('provider transport', () => {
     ['groq','GROQ_API_KEY','GROQ_MODEL','https://api.groq.com/openai/v1/chat/completions'],
     ['openrouter','OPENROUTER_API_KEY','OPENROUTER_MODEL','https://openrouter.ai/api/v1/chat/completions'],
     ['openai','OPENAI_API_KEY','OPENAI_MODEL','https://api.openai.com/v1/chat/completions'],
+    ['custom','AI_API_KEY','AI_MODEL','https://custom.example/v1/chat/completions'],
   ])('routes %s calls using configured credentials and model', async (_, keyVar, modelVar, url) => {
     process.env.AI_PROVIDER = _;
+    if (_ === 'custom') process.env.AI_BASE_URL = 'https://custom.example/v1';
     process.env[keyVar] = 'private-test-key'; process.env[modelVar] = 'runtime-model';
     const mock = jest.fn(async () => Response.json({choices:[{message:{content:'Hello'}}]}));
     global.fetch = mock as typeof fetch;
