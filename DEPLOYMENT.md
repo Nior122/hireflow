@@ -75,7 +75,7 @@ Add the Vercel domain under Clerk → Allowed origins / redirect URLs.
 2. Connect Gmail in Settings.
 3. Click **Sync Inbox** — recent inbox mail should import into HireFlow.
 
-Gmail is also synced every 6 hours via `vercel.json` cron (`/api/cron/gmail-sync`). Set `CRON_SECRET`.
+Gmail is also synced once a day at 08:00 UTC via `vercel.json` cron (`/api/cron/gmail-sync`). Vercel Hobby only allows daily crons; on Pro you can change the schedule to run more often. Set `CRON_SECRET`. Manual **Sync Inbox** still works anytime.
 
 ## 4. Alternate (Docker)
 
