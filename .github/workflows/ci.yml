@@ -8,6 +8,8 @@ on:
 
 env:
   NODE_VERSION: "20"
+  # Prisma generate/validate need a URL but do not connect to this placeholder.
+  DATABASE_URL: "postgresql://test:test@localhost:5432/test"
 
 jobs:
   lint-and-typecheck:
