@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "jest --passWithNoTests",
+    "ai:check": "node --experimental-strip-types --no-warnings scripts/ai-connection-check.mjs",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage --passWithNoTests",
     "test:e2e": "playwright test"

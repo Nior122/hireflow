@@ -22,12 +22,23 @@
 # Check database connection
 curl https://your-domain.com/api/health
 
+# Confirm which build is serving, and whether the AI provider resolves
+curl -s https://your-domain.com/api/health | jq '{deployment, ai: .checks.ai}'
+# deployment.commit must match the master commit you expect;
+# checks.ai.status "not_configured" names the missing variable.
+
 # Check Vercel logs
 vercel logs --follow
 
 # Rollback if needed
 vercel rollback
 ```
+
+If a URL shows old UI or old error strings, it is very likely a pinned
+`https://<project>-<hash>-<scope>.vercel.app` deployment URL (a bookmark, an emailed
+link, or a Clerk redirect), not the production domain. Compare `deployment.commit`
+against `git rev-parse origin/master` before debugging anything else. See
+`DEPLOYMENT.md` → "Confirm which build a URL is actually serving".
 
 ---
 

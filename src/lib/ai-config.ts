@@ -38,6 +38,16 @@ export function getAiConfig(): AiConfig {
   return { ...connection, model };
 }
 export function getAiConfigurationStatus() {
-  try { const { provider, model } = getAiConfig(); return { provider, model, configured: true as const, error: null }; }
-  catch (e) { return { provider: configured('AI_PROVIDER') ?? 'auto', model: null, configured: false as const, error: e instanceof Error ? e.message : 'AI not configured' }; }
+  // Report the provider even when only part of its configuration is present, so a
+  // missing model can be named against the provider that was actually inferred.
+  let label: string = configured('AI_PROVIDER')?.toLowerCase() ?? 'auto';
+  let model: string | null = null;
+  try {
+    const connection = getAiConnection();
+    label = connection.provider;
+    model = configured('AI_MODEL') ?? configured(MODELS[connection.provider]) ?? null;
+    if (!model) throw new Error(`AI_MODEL or ${MODELS[connection.provider]} is not set for ${connection.provider}`);
+    return { provider: label, model, configured: true as const, error: null };
+  }
+  catch (e) { return { provider: label, model, configured: false as const, error: e instanceof Error ? e.message : 'AI not configured' }; }
 }

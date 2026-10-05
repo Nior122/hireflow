@@ -25,6 +25,19 @@
 | `OPENAI_API_KEY` / `OPENAI_MODEL` | String | OpenAI-compatible chat API | platform.openai.com |
 | `AI_API_KEY` / `AI_BASE_URL` | String | Custom HTTPS OpenAI-compatible `/v1` provider (requires `AI_PROVIDER=custom`) | Your provider |
 
+### Verifying the AI configuration
+
+Every AI feature resolves the provider, key, model and endpoint at request time from the variables above. Nothing is hard-coded and the settings page never shows invented model cards.
+
+| Where | What it tells you |
+| --- | --- |
+| `npm run ai:check` (run where the variables are set) | Resolves the provider with the app's own module, lists the models the key can see, checks the configured model id is one of them, then performs one real completion. Never prints the key. |
+| `curl -s https://<host>/api/health \| jq .checks.ai` | `{status, provider, model, error}` for the deployment answering the request. `not_configured` with `AI_MODEL or GROQ_MODEL is not set for groq` means the key exists but the model does not. No credentials are returned. |
+| `curl -s https://<host>/api/health \| jq .deployment` | `{environment, commit, branch, url}` — proves which build and which Vercel environment served the response. |
+| Settings → AI (signed in) | Same status plus the live model list fetched from the provider, and a **Test AI connection** button that performs a real completion. |
+
+A key without a model is not a working configuration: the app will return `AI_MODEL or <PROVIDER>_MODEL is not set for <provider>` rather than guessing a model.
+
 ### Google Integration
 | Variable | Type | Description | How to Obtain |
 |----------|------|-------------|---------------|

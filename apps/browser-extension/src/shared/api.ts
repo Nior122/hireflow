@@ -1,6 +1,7 @@
 import type { AuthState } from "./types";
+import { APP_URL } from "./config";
 
-const API_BASE = "https://hireflow.vercel.app";
+const API_BASE = APP_URL;
 
 export async function getAuth(): Promise<AuthState> {
   return new Promise((resolve) => {

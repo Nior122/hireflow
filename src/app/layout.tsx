@@ -3,9 +3,12 @@ import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "@/components/Providers";
 import { assertEnv, getEnvStatusHtml } from "@/lib/validate-env";
+import { getSiteUrl } from "@/lib/site-url";
+
+const siteUrl = getSiteUrl();
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://hireflow.com"),
+  metadataBase: new URL(siteUrl),
   title: {
     default: "HireFlow - AI-Powered Job Tracker & Recruitment Platform",
     template: "%s | HireFlow",
@@ -29,7 +32,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://hireflow.com",
+    url: siteUrl,
     siteName: "HireFlow",
     title: "HireFlow - AI-Powered Job Tracker & Recruitment Platform",
     description:
@@ -62,7 +65,7 @@ export const metadata: Metadata = {
     },
   },
   alternates: {
-    canonical: "https://hireflow.com",
+    canonical: siteUrl,
   },
 };
 

@@ -1,4 +1,4 @@
-import { getAiConfig, getAiConnection } from './ai-config';
+import { getAiConfig, getAiConnection, getAiConfigurationStatus } from './ai-config';
 const vars = ['AI_PROVIDER','AI_API_KEY','AI_MODEL','AI_BASE_URL','GROQ_API_KEY','GROQ_MODEL','OPENROUTER_API_KEY','OPENROUTER_MODEL','OPENAI_API_KEY','OPENAI_MODEL'] as const;
 const previous = Object.fromEntries(vars.map(v => [v, process.env[v]]));
 beforeEach(() => { for (const v of vars) delete process.env[v]; });
@@ -10,3 +10,15 @@ test('Custom OpenAI-compatible endpoint with arbitrary model', () => { process.e
 test('Model lookup works before model is set', () => { process.env.GROQ_API_KEY='key'; expect(getAiConnection().provider).toBe('groq'); expect(() => getAiConfig()).toThrow(/GROQ_MODEL/); });
 test('Multiple keys require explicit provider choice', () => { process.env.GROQ_API_KEY='key'; process.env.OPENAI_API_KEY='key'; expect(() => getAiConfig()).toThrow(/Multiple AI providers/); process.env.AI_PROVIDER='openai'; process.env.AI_MODEL='selected'; expect(getAiConfig().provider).toBe('openai'); });
 test('Reject unsafe custom URL', () => { process.env.AI_PROVIDER='custom'; process.env.AI_API_KEY='key'; process.env.AI_MODEL='chosen'; process.env.AI_BASE_URL='http://localhost:3000'; expect(() => getAiConfig()).toThrow(/HTTPS/); });
+test('Status names the inferred provider when the model is missing', () => {
+  process.env.GROQ_API_KEY='key';
+  const status = getAiConfigurationStatus();
+  expect(status).toMatchObject({ provider: 'groq', model: null, configured: false });
+  expect(status.error).toMatch(/GROQ_MODEL/);
+});
+test('Status reports a healthy configuration without credentials', () => {
+  process.env.OPENROUTER_API_KEY='key'; process.env.OPENROUTER_MODEL='vendor/model';
+  const status = getAiConfigurationStatus();
+  expect(status).toMatchObject({ provider: 'openrouter', model: 'vendor/model', configured: true, error: null });
+  expect(JSON.stringify(status)).not.toContain('key');
+});

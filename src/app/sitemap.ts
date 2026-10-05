@@ -1,7 +1,8 @@
 import { MetadataRoute } from "next";
+import { getSiteUrl } from "@/lib/site-url";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://hireflow.com";
+  const baseUrl = getSiteUrl();
 
   return [
     {

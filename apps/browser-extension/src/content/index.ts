@@ -1,3 +1,4 @@
+import { APP_URL } from "../shared/config";
 import { detectCurrentSite } from "./detectors";
 import type { DetectedJob } from "../shared/types";
 
@@ -152,7 +153,7 @@ function togglePopup() {
   document.getElementById("hf-match")?.addEventListener("click", handleMatch);
   document.getElementById("hf-cover")?.addEventListener("click", handleCoverLetter);
   document.getElementById("hf-view")?.addEventListener("click", () => {
-    window.open("https://hireflow.vercel.app/dashboard/discover", "_blank");
+    window.open(`${APP_URL}/dashboard/discover`, "_blank");
   });
 }
 
