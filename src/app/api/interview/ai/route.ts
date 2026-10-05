@@ -1,14 +1,13 @@
 import { NextRequest } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { GROQ_API_URL, GROQ_MODEL } from "@/lib/ai-config";
+import { requireDbUser } from "@/lib/clerk";
+import { groqChatJson, getGroqApiKey } from "@/lib/ai/groq";
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await requireDbUser();
+  if (!user) return Response.json({ error: "Please sign in to use AI." }, { status: 401 });
 
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey || apiKey === "placeholder") {
-    return Response.json({ error: "AI not configured" }, { status: 500 });
+  if (!getGroqApiKey() && process.env.DEMO_MODE !== "true") {
+    return Response.json({ error: "AI is not configured. Set GROQ_API_KEY." }, { status: 500 });
   }
 
   try {
@@ -65,24 +64,18 @@ On final response, provide full evaluation.`,
     const prompt = prompts[action];
     if (!prompt) return Response.json({ error: "Unknown action" }, { status: 400 });
 
-    const response = await fetch(GROQ_API_URL, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [
-          { role: "system", content: prompt.system },
-          { role: "user", content: prompt.user },
-        ],
-        temperature: 0.5,
-        max_tokens: 1500,
-      }),
+    const groq = await groqChatJson({
+      messages: [
+        { role: "system", content: prompt.system },
+        { role: "user", content: prompt.user },
+      ],
+      temperature: 0.5,
+      max_tokens: 1500,
     });
 
-    if (!response.ok) return Response.json({ error: "AI error" }, { status: 502 });
+    if (!groq.ok) return Response.json({ error: groq.error ?? "AI error" }, { status: groq.status });
 
-    const result = await response.json();
-    const content = result.choices?.[0]?.message?.content ?? "";
+    const content = groq.content;
 
     // Try JSON parse
     const jsonActions = ["generate_question", "evaluate_answer", "company_research", "generate_questions", "star_coach"];

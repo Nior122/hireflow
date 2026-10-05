@@ -7,6 +7,7 @@ import {
   getRecruiterPerformance, generateAiInsights, getCandidateScores,
 } from "@/lib/analytics/aggregation";
 import type { ActionResponse } from "@/lib/types";
+import { groqChatJson, getGroqApiKey } from "@/lib/ai/groq";
 
 // ─── Executive Dashboard ───────────────────────────────────────
 
@@ -102,29 +103,22 @@ export async function generateReport(orgId?: string): Promise<ActionResponse<str
       generateAiInsights(targetOrg),
     ]);
 
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey || apiKey === "placeholder") {
+    if (!getGroqApiKey() && process.env.DEMO_MODE !== "true") {
       return { success: true, data: generateTextReport(metrics, funnel, sources, insights) };
     }
 
     try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "llama-3.1-70b-versatile",
-          messages: [
-            { role: "system", content: "You are an expert HR analyst. Generate a professional quarterly hiring report in markdown. Include executive summary, key metrics, trends, insights, and recommendations." },
-            { role: "user", content: `Generate a hiring report based on this data:\n\nMetrics: ${JSON.stringify(metrics)}\nFunnel: ${JSON.stringify(funnel)}\nSources: ${JSON.stringify(sources)}\nInsights: ${JSON.stringify(insights.map((i: { title: string; description: string }) => ({ title: i.title, description: i.description })))}` },
-          ],
-          temperature: 0.4,
-          max_tokens: 2000,
-        }),
+      const groq = await groqChatJson({
+        messages: [
+          { role: "system", content: "You are an expert HR analyst. Generate a professional quarterly hiring report in markdown. Include executive summary, key metrics, trends, insights, and recommendations." },
+          { role: "user", content: `Generate a hiring report based on this data:\n\nMetrics: ${JSON.stringify(metrics)}\nFunnel: ${JSON.stringify(funnel)}\nSources: ${JSON.stringify(sources)}\nInsights: ${JSON.stringify(insights.map((i: { title: string; description: string }) => ({ title: i.title, description: i.description })))}` },
+        ],
+        temperature: 0.4,
+        max_tokens: 2000,
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        return { success: true, data: data.choices?.[0]?.message?.content ?? generateTextReport(metrics, funnel, sources, insights) };
+      if (groq.ok && groq.content) {
+        return { success: true, data: groq.content };
       }
     } catch {}
 

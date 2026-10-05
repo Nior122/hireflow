@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AddApplicationDialog } from "./AddApplicationDialog";
 import { SchedulingAssistant } from "./SchedulingAssistant";
 import { toast } from "sonner";
+import { syncGmailInbox } from "@/actions/gmail-sync";
 
 export function QuickActionsFAB() {
   const [open, setOpen] = useState(false);
@@ -14,20 +15,18 @@ export function QuickActionsFAB() {
   
 
   async function handleSyncEmail() {
-    
     setOpen(false);
-    toast.info("Scanning inbox for new applications...");
+    toast.info("Scanning inbox for new emails...");
     try {
-      const response = await fetch("/api/cron/gmail-sync");
-      if (response.ok) {
-        toast.success("Inbox scan triggered in background.");
+      const result = await syncGmailInbox();
+      if (result.success) {
+        toast.success(`Imported ${result.data?.emailsProcessed ?? 0} emails from Gmail.`);
       } else {
-        toast.error("Failed to sync Gmail");
+        toast.error(result.error ?? "Failed to sync Gmail");
       }
     } catch {
       toast.error("Failed to sync Gmail");
     }
-    
   }
 
   const actions = [

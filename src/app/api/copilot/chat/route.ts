@@ -1,23 +1,20 @@
 import { NextRequest } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { createOrGetUser } from "@/lib/clerk";
+import { requireDbUser } from "@/lib/clerk";
 import { prisma } from "@/lib/prisma";
 import { gatherContext } from "@/lib/copilot/context";
 import { buildSystemPrompt, buildUserMessage } from "@/lib/copilot/prompt";
 import { TOOL_DEFINITIONS, executeTool } from "@/lib/copilot/tools";
-import { GROQ_API_URL, GROQ_MODEL } from "@/lib/ai-config";
+import { groqFetch, getGroqApiKey } from "@/lib/ai/groq";
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return new Response("Unauthorized", { status: 401 });
+  const user = await requireDbUser();
+  if (!user) return new Response(JSON.stringify({ error: "Please sign in to use Copilot." }), { status: 401 });
 
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey || apiKey === "placeholder") {
-    return new Response(JSON.stringify({ error: "AI service not configured. Set GROQ_API_KEY." }), { status: 500 });
+  if (!getGroqApiKey() && process.env.DEMO_MODE !== "true") {
+    return new Response(JSON.stringify({ error: "AI is not configured. Set GROQ_API_KEY in Vercel environment variables." }), { status: 500 });
   }
 
   try {
-    const user = await createOrGetUser();
     const body = await req.json();
     const { messages, conversationId } = body;
 
@@ -25,7 +22,13 @@ export async function POST(req: NextRequest) {
       return new Response("Messages required", { status: 400 });
     }
 
-    const context = await gatherContext(user.id, user.role);
+    let context;
+    try {
+      context = await gatherContext(user.id, user.role);
+    } catch (err) {
+      console.error("Copilot context error:", err);
+      context = { role: user.role };
+    }
     const systemPrompt = buildSystemPrompt(context);
 
     // Build messages for Groq
@@ -43,31 +46,28 @@ export async function POST(req: NextRequest) {
       }),
     ];
 
-    // Use Groq with streaming and tool use
-    const response = await fetch(GROQ_API_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: groqMessages,
-        tools: TOOL_DEFINITIONS.map(t => ({
-          type: "function",
-          function: { name: t.name, description: t.description, parameters: t.parameters },
-        })),
-        tool_choice: "auto",
-        temperature: 0.3,
-        max_tokens: 2048,
-        stream: true,
-      }),
-    });
+    const response = await groqFetch({
+      messages: groqMessages,
+      tools: TOOL_DEFINITIONS.map(t => ({
+        type: "function",
+        function: { name: t.name, description: t.description, parameters: t.parameters },
+      })),
+      tool_choice: "auto",
+      temperature: 0.3,
+      max_tokens: 2048,
+      stream: true,
+    }, { timeoutMs: 45_000 });
 
     if (!response.ok) {
-      const err = await response.text();
-      console.error("Groq API error:", err);
-      return new Response(JSON.stringify({ error: "AI service error" }), { status: 502 });
+      let detail = "AI service error";
+      try {
+        const err = await response.json();
+        if (typeof err.error === "string") detail = err.error;
+      } catch {
+        /* ignore */
+      }
+      console.error("Groq API error:", detail);
+      return new Response(JSON.stringify({ error: detail }), { status: response.status });
     }
 
     // Stream the response
@@ -168,17 +168,12 @@ export async function POST(req: NextRequest) {
             );
 
             // Stream follow-up response
-            const followUp = await fetch(GROQ_API_URL, {
-              method: "POST",
-              headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-              body: JSON.stringify({
-                model: GROQ_MODEL,
-                messages: groqMessages,
-                temperature: 0.3,
-                max_tokens: 2048,
-                stream: true,
-              }),
-            });
+            const followUp = await groqFetch({
+              messages: groqMessages,
+              temperature: 0.3,
+              max_tokens: 2048,
+              stream: true,
+            }, { timeoutMs: 45_000 });
 
             if (followUp.ok) {
               const fuReader = followUp.body?.getReader();

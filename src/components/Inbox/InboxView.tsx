@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { getInboxEmails } from '@/actions/gmail-sync';
+import { useState, useEffect, useRef, useTransition } from 'react';
+import { getInboxEmails, getGmailSyncStatus, syncGmailInbox } from '@/actions/gmail-sync';
 import { formatDistanceToNow } from 'date-fns';
-import { Inbox, Briefcase, Users, Calendar, XCircle, Award, FileText, Loader2, Search } from 'lucide-react';
+import { Inbox, Briefcase, Users, Calendar, XCircle, Award, FileText, Loader2, Search, RefreshCw, Plug } from 'lucide-react';
 import EmailDetail from './EmailDetail';
+import { toast } from 'sonner';
 
 const CATEGORIES = [
   { id: 'ALL', label: 'All', icon: Inbox },
@@ -41,45 +42,89 @@ export default function InboxView() {
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [emailCount, setEmailCount] = useState(0);
+  const [isSyncing, startSync] = useTransition();
+  const autoSyncAttempted = useRef(false);
+
+  async function fetchEmails(category = activeTab) {
+    setLoading(true);
+    setError(null);
+    try {
+      const [statusRes, res] = await Promise.all([
+        getGmailSyncStatus(),
+        getInboxEmails({
+          category: category === 'ALL' ? undefined : category,
+          pageSize: 50,
+        }),
+      ]);
+
+      if (statusRes.success && statusRes.data) {
+        setConnected(statusRes.data.connected);
+        setEmailCount(statusRes.data.emailCount);
+      }
+
+      if (!res.success) {
+        setError(res.error || 'Failed to fetch emails');
+      } else if (res.data) {
+        setEmails(res.data.emails as InboxEmail[]);
+        setSelectedEmailId((current) => {
+          if (current && res.data!.emails.some((e) => e.id === current)) return current;
+          return res.data!.emails[0]?.id ?? null;
+        });
+      }
+    } catch {
+      setError('An unexpected error occurred.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     let mounted = true;
-    
-    async function fetchEmails() {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await getInboxEmails({
-          category: activeTab === 'ALL' ? undefined : activeTab,
-          pageSize: 50,
-        });
-        
-        if (mounted) {
-          if (!res.success) {
-            setError(res.error || 'Failed to fetch emails');
-          } else if (res.data) {
-            setEmails(res.data.emails as InboxEmail[]);
-            // Optionally select the first email automatically
-            if (!selectedEmailId && res.data.emails.length > 0) {
-              setSelectedEmailId(res.data.emails[0].id);
-            } else if (res.data.emails.length === 0) {
-              setSelectedEmailId(null);
-            }
-          }
-        }
-      } catch (err) {
-        if (mounted) setError('An unexpected error occurred.');
-      } finally {
-        if (mounted) setLoading(false);
-      }
+
+    async function load() {
+      await fetchEmails();
+      if (!mounted) return;
     }
 
-    fetchEmails();
-
+    load();
     return () => {
       mounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
+
+  useEffect(() => {
+    if (loading || autoSyncAttempted.current) return;
+    if (connected && emailCount === 0) {
+      autoSyncAttempted.current = true;
+      handleSync(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, connected, emailCount]);
+
+  function handleSync(forceFullSync = emailCount === 0) {
+    startSync(async () => {
+      try {
+        const result = await syncGmailInbox({ forceFullSync });
+        if (result.success) {
+          const processed = result.data?.emailsProcessed ?? 0;
+          const skipped = result.data?.emailsSkipped ?? 0;
+          toast.success(
+            processed + skipped === 0
+              ? 'Sync finished. No inbox messages were returned — try Reconnect if this is unexpected.'
+              : `Imported ${processed} email${processed === 1 ? '' : 's'}${skipped ? ` (${skipped} already stored)` : ''}.`
+          );
+          await fetchEmails();
+        } else {
+          toast.error(result.error ?? 'Failed to sync Gmail. Please connect in Settings.');
+        }
+      } catch {
+        toast.error('Network error while syncing Gmail. Please try again.');
+      }
+    });
+  }
 
   const selectedEmail = emails.find(e => e.id === selectedEmailId);
 
@@ -88,7 +133,27 @@ export default function InboxView() {
       {/* Left Sidebar - Email List */}
       <div className="w-[400px] border-r border-white/10 flex flex-col bg-[#111]">
         {/* Tabs / Filters */}
-        <div className="p-4 border-b border-white/10">
+        <div className="p-4 border-b border-white/10 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            {connected ? (
+              <button
+                onClick={() => handleSync(emailCount === 0)}
+                disabled={isSyncing}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-indigo-500/20 text-indigo-300 text-sm font-medium hover:bg-indigo-500/30 disabled:opacity-60"
+              >
+                {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                {isSyncing ? 'Syncing…' : 'Sync Inbox'}
+              </button>
+            ) : (
+              <button
+                onClick={() => { window.location.href = '/api/auth/gmail/connect'; }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-indigo-500 text-white text-sm font-medium hover:bg-indigo-400"
+              >
+                <Plug className="w-4 h-4" />
+                Connect Gmail
+              </button>
+            )}
+          </div>
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
             {CATEGORIES.map((cat) => {
               const Icon = cat.icon;
@@ -112,10 +177,10 @@ export default function InboxView() {
 
         {/* List Content */}
         <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
-          {loading ? (
+          {loading || isSyncing ? (
             <div className="flex flex-col items-center justify-center h-48 text-gray-400">
               <Loader2 className="w-6 h-6 animate-spin mb-2" />
-              <p className="text-sm">Loading emails...</p>
+              <p className="text-sm">{isSyncing ? 'Importing emails from Gmail…' : 'Loading emails...'}</p>
             </div>
           ) : error ? (
             <div className="p-6 text-center text-red-400 text-sm">{error}</div>
@@ -123,7 +188,11 @@ export default function InboxView() {
             <div className="flex flex-col items-center justify-center h-48 text-gray-500 p-6 text-center">
               <Search className="w-8 h-8 mb-3 opacity-50" />
               <p className="text-sm font-medium text-gray-400">No emails found</p>
-              <p className="text-xs mt-1">Try selecting a different category or sync your inbox.</p>
+              <p className="text-xs mt-1">
+                {connected
+                  ? 'Sync your inbox to import recent Gmail messages.'
+                  : 'Connect Gmail, then sync to import your emails.'}
+              </p>
             </div>
           ) : (
             <div className="divide-y divide-white/5">

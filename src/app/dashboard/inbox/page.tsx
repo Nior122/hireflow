@@ -1,5 +1,7 @@
 import InboxView from "@/components/Inbox/InboxView";
 
+export const maxDuration = 60;
+
 export const metadata = {
   title: "Inbox - Gmail Intelligence Center",
 };

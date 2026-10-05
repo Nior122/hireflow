@@ -1,60 +1,11 @@
-'use server';
+"use server";
 
 import { prisma } from "@/lib/prisma";
 import { createOrGetUser } from "@/lib/clerk";
-import { GroqProvider } from "@/lib/ai/providers";
 import { revalidatePath } from "next/cache";
 import type { ActionResponse } from "@/lib/types";
-import { z } from "zod";
-import { extractCareerMemory } from "@/actions/memory-service";
-import { extractJobDetails, extractInterviewDetails } from "@/lib/ai/extraction";
-
-// Internal helper to trigger memory extraction after sync (non-blocking)
-async function extractAndStoreMemoryFromGmail(userId: string, text: string) {
-  // We need server-side user context — re-use the userId directly since this is server-side
-  const fakeReq = { createOrGetUser: async () => ({ id: userId }) };
-  void fakeReq; // suppress unused var warning
-  // Call memory service action with gmail source
-  // We skip createOrGetUser here since we already have the userId
-  await prisma.aIUserMemory.findMany({ where: { userId } }); // warm cache
-  return extractCareerMemory(text, "GMAIL");
-}
-
-
-// ─── Types ─────────────────────────────────────────────────────────────────
-
-const EmailClassificationSchema = z.object({
-  category: z.enum([
-    "JOB_OPPORTUNITY", "APPLICATIONS", "INTERVIEWS", "OFFERS", "REJECTIONS",
-    "RECRUITERS", "NETWORKING", "CAREER", "IMPORTANT", "OTHER"
-  ]),
-  confidence: z.number().min(0).max(1),
-  jobRelated: z.boolean().default(false),
-  applicationRelated: z.boolean().default(false),
-  interviewRelated: z.boolean().default(false),
-  rejectionRelated: z.boolean().default(false),
-  offerRelated: z.boolean().default(false),
-  company: z.string().nullable().optional(),
-  role: z.string().nullable().optional(),
-  summary: z.string().optional(),
-  actionRequired: z.boolean().default(false),
-  action: z.string().nullable().optional(),
-  urgency: z.number().min(0).max(1).default(0),
-  importance: z.number().min(0).max(1).default(0),
-  replyDraft: z.string().nullable().optional(),
-});
-
-type EmailClassification = z.infer<typeof EmailClassificationSchema>;
-
-interface GmailSyncSummary {
-  emailsProcessed: number;
-  jobsDiscovered: number;
-  applicationsDiscovered: number;
-  interviewsDiscovered: number;
-  rejectionsDiscovered: number;
-  offersDiscovered: number;
-  syncedAt: Date;
-}
+import { runGmailSyncForUser, type GmailSyncSummary } from "@/lib/gmail/sync-engine";
+import { deterministicClassify, inferCompanyAndRole } from "@/lib/gmail/email-utils";
 
 interface InboxEmailRecord {
   id: string;
@@ -80,736 +31,31 @@ interface InboxEmailRecord {
   createdAt: Date;
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-export async function getValidGmailToken(userId: string): Promise<string | null> {
-  const token = await prisma.gmailToken.findUnique({ where: { userId } });
-  if (!token) return null;
-
-  if (token.expiryDate && new Date(token.expiryDate) < new Date(Date.now() + 60_000)) {
-    try {
-      const clientId = process.env.GOOGLE_CLIENT_ID;
-      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-      if (!clientId || !clientSecret) return null;
-
-      const { google } = await import("googleapis");
-      const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
-      oauth2Client.setCredentials({ refresh_token: token.refreshToken });
-
-      const { credentials } = await oauth2Client.refreshAccessToken();
-      if (!credentials.access_token) return null;
-
-      await prisma.gmailToken.update({
-        where: { userId },
-        data: {
-          accessToken: credentials.access_token,
-          expiryDate: credentials.expiry_date
-            ? new Date(credentials.expiry_date)
-            : new Date(Date.now() + 3_600_000),
-        },
-      });
-      return credentials.access_token;
-    } catch {
-      return null;
-    }
-  }
-
-  return token.accessToken;
+function revalidateInbox() {
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/inbox");
+  revalidatePath("/dashboard/settings");
 }
 
-function parseJsonFromLlm(raw: string): any {
-  let cleaned = raw.trim();
-  if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-  }
-  const firstBrace = cleaned.indexOf("{");
-  const lastBrace = cleaned.lastIndexOf("}");
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
-  }
-  return JSON.parse(cleaned);
-}
-
-function inferCompanyAndRole(
-  extractedCompany?: string | null,
-  extractedRole?: string | null,
-  subject?: string | null,
-  senderName?: string | null,
-  senderEmail?: string | null
-): { company: string; role: string } {
-  let company = extractedCompany?.trim() || "";
-  let role = extractedRole?.trim() || "";
-
-  const cleanSubject = subject || "";
-  const cleanSender = senderName || "";
-  const cleanEmail = senderEmail || "";
-
-  // 1. Infer company from Subject regex patterns if missing
-  if (!company) {
-    const atMatch = cleanSubject.match(/(?:at|with|for)\s+([A-Z][A-Za-z0-9\s.&'-]+)/);
-    if (atMatch) {
-      company = atMatch[1].split(/[-–—|:]/)[0].trim();
-    } else {
-      const dashMatch = cleanSubject.match(/^([A-Z][A-Za-z0-9\s.&'-]+)\s*[-–—|:]/);
-      if (dashMatch && !/thank|application|interview|rejection|status|your|job/i.test(dashMatch[1])) {
-        company = dashMatch[1].trim();
-      }
-    }
-  }
-
-  // 2. Infer company from Sender Name
-  if (!company && cleanSender) {
-    const cleanSenderName = cleanSender.replace(/\b(Careers|Recruiting|Talent|HR|Team|Jobs|Notifications|No-Reply|Hiring)\b/gi, "").trim();
-    if (cleanSenderName && cleanSenderName.length > 1) {
-      company = cleanSenderName;
-    }
-  }
-
-  // 3. Infer company from Sender Email Domain
-  if (!company && cleanEmail && cleanEmail.includes("@")) {
-    const domain = cleanEmail.split("@")[1]?.toLowerCase();
-    const commonMailers = ["gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com", "greenhouse.io", "lever.co", "workday.com", "ashbyhq.com", "smartrecruiters.com"];
-    if (domain && !commonMailers.includes(domain)) {
-      const domainName = domain.split(".")[0];
-      if (domainName) {
-        company = domainName.charAt(0).toUpperCase() + domainName.slice(1);
-      }
-    }
-  }
-
-  if (!company) {
-    company = cleanSender || "Company";
-  }
-
-  // Infer Role from Subject if missing
-  if (!role && cleanSubject) {
-    const roleMatch = cleanSubject.match(/(?:for|role|position|as)\s+([A-Za-z0-9\s/-]+?)(?:\s+at|\s+with|\s*[-–—|:]|$)/i);
-    if (roleMatch) {
-      role = roleMatch[1].trim();
-    }
-  }
-  if (!role) role = "Software Role";
-
-  return { company, role };
-}
-
-function deterministicClassify(text: string): EmailClassification {
-  text = text.toLowerCase();
-
-  let partial: any = { category: "OTHER", confidence: 0.5 };
-
-  if (/interview|schedule|phone screen|video call|coding challenge|assessment|coderpad|hackerrank|availability|meet with/i.test(text)) {
-    partial = { category: "INTERVIEWS", confidence: 0.8, interviewRelated: true, jobRelated: true };
-  } else if (/unfortunately|not moving forward|not selected|not a fit|other candidates|regret to inform|position has been filled|pursuing other|decision on your/i.test(text)) {
-    partial = { category: "REJECTIONS", confidence: 0.85, rejectionRelated: true, jobRelated: true };
-  } else if (/pleased to offer|offer letter|compensation package|employment offer|congratulations/i.test(text)) {
-    partial = { category: "OFFERS", confidence: 0.9, offerRelated: true, jobRelated: true };
-  } else if (/thank you for applying|application received|we received|application update|application status|confirmation|submission|applied/i.test(text)) {
-    partial = { category: "APPLICATIONS", confidence: 0.85, applicationRelated: true, jobRelated: true };
-  } else if (/job opportunity|open position|hiring|exciting role|we are looking for|position available|join our team|engineer|developer|architect/i.test(text)) {
-    partial = { category: "JOB_OPPORTUNITY", confidence: 0.75, jobRelated: true };
-  } else if (/recruiter|talent acquisition|sourcing|headhunter|outreach|saw your profile|saw your linkedin/i.test(text)) {
-    partial = { category: "RECRUITERS", confidence: 0.75, jobRelated: true };
-  } else if (/deadline|action required|important/i.test(text)) {
-    partial = { category: "IMPORTANT", confidence: 0.65, jobRelated: true };
-  }
-
-  return EmailClassificationSchema.parse(partial);
-}
-
-async function aiClassifyEmail(
-  subject: string,
-  sender: string,
-  snippet: string,
-  body: string
-): Promise<EmailClassification> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return deterministicClassify(`${subject} ${snippet}`);
-
-  const limitedBody = body ? body.substring(0, 1500) : "";
-
-  const prompt = `You are a personal AI career assistant. Classify this email and extract career-related information.
-Do NOT invent missing information. If company or role cannot be determined, return null.
-
-Email:
-Subject: ${subject}
-From: ${sender}
-Snippet: ${snippet}
-Body:
-${limitedBody}
-
-Respond ONLY with a JSON object matching this schema (no markdown, no extra text):
-{
-  "category": "JOB_OPPORTUNITY|APPLICATIONS|INTERVIEWS|OFFERS|REJECTIONS|RECRUITERS|NETWORKING|CAREER|IMPORTANT|OTHER",
-  "confidence": 0.0-1.0,
-  "jobRelated": boolean,
-  "applicationRelated": boolean,
-  "interviewRelated": boolean,
-  "rejectionRelated": boolean,
-  "offerRelated": boolean,
-  "company": "company name if found, else null",
-  "role": "job title if found, else null",
-  "summary": "1-sentence summary",
-  "actionRequired": boolean,
-  "action": "Recommended next action or null",
-  "urgency": 0.0-1.0,
-  "importance": 0.0-1.0,
-  "replyDraft": "Polite draft if actionRequired else null"
-}`;
-
-  try {
-    const provider = new GroqProvider();
-    const response = await provider.chat([
-      { role: "user", content: prompt }
-    ], { temperature: 0.1, maxTokens: 512 });
-
-    const parsed = parseJsonFromLlm(response);
-    return EmailClassificationSchema.parse(parsed);
-  } catch (err) {
-    console.error("[aiClassifyEmail] LLM parsing error, using fallback:", err);
-    return deterministicClassify(`${subject} ${snippet}`);
-  }
-}
-
-function safeBase64UrlDecode(str: string): string {
-  if (!str) return "";
-  try {
-    let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
-    while (base64.length % 4) {
-      base64 += "=";
-    }
-    return Buffer.from(base64, "base64").toString("utf-8");
-  } catch {
-    return "";
-  }
-}
-
-// Extract body text recursively from Gmail payload parts
-function extractEmailBody(payload: any): string {
-  if (!payload) return "";
-  let body = "";
-
-  if (payload.body?.data) {
-    body += safeBase64UrlDecode(payload.body.data) + "\n";
-  }
-
-  if (payload.parts) {
-    for (const part of payload.parts) {
-      if (part.body?.data) {
-        body += safeBase64UrlDecode(part.body.data) + "\n";
-      }
-      if (part.parts) {
-        body += extractEmailBody(part) + "\n";
-      }
-    }
-  }
-
-  // Strip HTML tags for clean AI context
-  return body.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-             .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-             .replace(/<[^>]*>?/gm, ' ')
-             .replace(/\s+/g, ' ')
-             .trim();
-}
-
-function parseEmailAddress(raw: string): { name: string; email: string } {
-  const match = raw.match(/^(.*?)\s*<(.+?)>$/);
-  if (match) return { name: match[1].trim().replace(/^"|"$/g, ""), email: match[2].trim() };
-  return { name: raw, email: raw };
-}
-
-// ─── Public Server Actions ──────────────────────────────────────────────────
-
-export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>> {
+export async function syncGmailInbox(options?: {
+  forceFullSync?: boolean;
+}): Promise<ActionResponse<GmailSyncSummary>> {
   try {
     const user = await createOrGetUser();
-    const tokenRecord = await prisma.gmailToken.findUnique({ where: { userId: user.id } });
-    const accessToken = await getValidGmailToken(user.id);
-    
-    if (!accessToken || !tokenRecord) {
-      return { success: false, error: "Gmail not connected. Please connect Gmail in Settings first." };
-    }
-
-    let messageList: { id: string }[] = [];
-    let newHistoryId: string | null = null;
-    let incrementalSyncSuccess = false;
-
-    if (tokenRecord.historyId) {
-      // Try incremental sync
-      const histRes = await fetch(
-        `https://www.googleapis.com/gmail/v1/users/me/history?startHistoryId=${tokenRecord.historyId}&historyTypes=messageAdded`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-
-      if (histRes.ok) {
-        incrementalSyncSuccess = true;
-        const histData = await histRes.json();
-        newHistoryId = histData.historyId || null;
-        
-        const historyRecords = histData.history || [];
-        for (const record of historyRecords) {
-          if (record.messagesAdded) {
-            for (const item of record.messagesAdded) {
-              if (item.message && item.message.id) {
-                messageList.push({ id: item.message.id });
-              }
-            }
-          }
-        }
-      } else {
-        console.log("[gmail-sync] historyId expired or invalid, falling back to full list.");
-      }
-    }
-
-    if (!incrementalSyncSuccess) {
-      // Fallback: Full sync of recent 100 messages
-      const listRes = await fetch(
-        "https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=100",
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-
-      if (!listRes.ok) {
-        const err = await listRes.json().catch(() => ({}));
-        console.error("[gmail-sync] list failed:", listRes.status, err);
-        return { success: false, error: "Failed to fetch Gmail messages. Please reconnect Gmail." };
-      }
-
-      const listData = await listRes.json();
-      messageList = listData.messages ?? [];
-      
-      // We can grab the current profile historyId to use for next time
-      const profileRes = await fetch(
-        "https://www.googleapis.com/gmail/v1/users/me/profile",
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      if (profileRes.ok) {
-        const profileData = await profileRes.json();
-        newHistoryId = profileData.historyId || null;
-      }
-    }
-
-    // Deduplicate message list IDs
-    const uniqueIds = Array.from(new Set(messageList.map(m => m.id)));
-    messageList = uniqueIds.map(id => ({ id }));
-
-    let emailsProcessed = 0;
-    let jobsDiscovered = 0;
-    let applicationsDiscovered = 0;
-    let interviewsDiscovered = 0;
-    let rejectionsDiscovered = 0;
-    let offersDiscovered = 0;
-
-    for (const msg of messageList) {
-      try {
-        // Fetch full message to get the actual body
-        const metaRes = await fetch(
-          `https://www.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        if (!metaRes.ok) continue;
-
-        const meta = await metaRes.json();
-        const headers: { name: string; value: string }[] = meta.payload?.headers ?? [];
-        const getHeader = (name: string) => headers.find(h => h.name === name)?.value ?? "";
-
-        const subject = getHeader("Subject");
-        const fromRaw = getHeader("From");
-        const to = getHeader("To");
-        const dateStr = getHeader("Date");
-
-        const { name: sender, email: senderEmail } = parseEmailAddress(fromRaw);
-        const snippet: string = meta.snippet ?? "";
-        const labelIds: string[] = meta.labelIds ?? [];
-        const isRead = !labelIds.includes("UNREAD");
-
-        let receivedAt: Date | null = null;
-        if (dateStr) {
-          const parsed = new Date(dateStr);
-          if (!isNaN(parsed.getTime())) receivedAt = parsed;
-        }
-        if (!receivedAt && meta.internalDate) {
-          receivedAt = new Date(parseInt(meta.internalDate));
-        }
-
-        // Extract the actual email body
-        const bodyText = extractEmailBody(meta.payload);
-        const limitedBody = bodyText.slice(0, 2500);
-
-        // Always save EmailMessage first to prevent data loss
-        let savedEmail = await prisma.emailMessage.upsert({
-          where: { gmailMessageId: msg.id },
-          create: {
-            userId: user.id,
-            gmailMessageId: msg.id,
-            gmailThreadId: meta.threadId ?? null,
-            sender: sender || null,
-            senderEmail: senderEmail || null,
-            recipients: to || null,
-            subject: subject || null,
-            snippet: snippet.slice(0, 500) || null,
-            body: limitedBody || null,
-            receivedAt,
-            isRead,
-            labels: labelIds,
-            // Fallback defaults until classified
-            category: "OTHER",
-          },
-          update: {
-            isRead,
-            labels: labelIds,
-            // DO NOT OVERWRITE category if already set, wait for re-classification
-          }
-        });
-
-        // AI classify with fallback
-        let classification;
-        try {
-          classification = await aiClassifyEmail(subject, fromRaw, snippet, limitedBody);
-        } catch (aiErr) {
-          console.warn("[gmail-sync] AI classification failed, using fallback:", aiErr instanceof Error ? aiErr.message : "unknown");
-          classification = deterministicClassify(`${subject} ${snippet}`);
-        }
-
-        // Update the EmailMessage with classification results
-        savedEmail = await prisma.emailMessage.update({
-          where: { id: savedEmail.id },
-          data: {
-            category: classification.category,
-            confidence: classification.confidence,
-            jobRelated: classification.jobRelated,
-            applicationRelated: classification.applicationRelated,
-            interviewRelated: classification.interviewRelated,
-            rejectionRelated: classification.rejectionRelated,
-            offerRelated: classification.offerRelated,
-            urgency: classification.urgency,
-            importance: classification.importance,
-            action: classification.action ?? null,
-            replyDraft: classification.replyDraft ?? null,
-            jobApplicationId: null,
-            isRead,
-            labels: labelIds,
-            // Only update body if we didn't have one before
-            ...(limitedBody ? { body: limitedBody } : {}),
-          },
-        });
-
-        emailsProcessed++;
-
-        // ─── Entity Extraction Pipeline ──────────────────────────────────
-        let linkedJobAppId: string | null = null;
-
-        const { company: inferredCompany, role: inferredRole } = inferCompanyAndRole(
-          classification.company,
-          classification.role,
-          subject,
-          sender,
-          senderEmail
-        );
-
-        console.log(`[GMAIL SYNC] msgId=${msg.id} | category=${classification.category} | company="${inferredCompany}" | role="${inferredRole}" | subject="${subject}"`);
-
-        if (classification.category === "JOB_OPPORTUNITY") {
-          const jobDetails = await extractJobDetails(subject, snippet);
-          const company = jobDetails?.company || inferredCompany;
-          const title = jobDetails?.title || inferredRole;
-
-          if (company && title) {
-            const existingApp = await prisma.jobApplication.findFirst({
-              where: {
-                userId: user.id,
-                company: { equals: company, mode: "insensitive" },
-                role: { equals: title, mode: "insensitive" },
-              }
-            });
-
-            if (existingApp) {
-              linkedJobAppId = existingApp.id;
-            } else {
-              const existingDiscovered = await prisma.discoveredJob.findFirst({
-                where: {
-                  userId: user.id,
-                  company: { equals: company, mode: "insensitive" },
-                  title: { equals: title, mode: "insensitive" },
-                },
-              });
-
-              if (!existingDiscovered) {
-                await prisma.discoveredJob.create({
-                  data: {
-                    userId: user.id,
-                    sourceEmailId: savedEmail.id,
-                    title,
-                    company,
-                    location: jobDetails?.location || null,
-                    employmentType: jobDetails?.employmentType || null,
-                    remoteType: jobDetails?.remoteType || null,
-                    salaryMin: jobDetails?.salaryMin || null,
-                    salaryMax: jobDetails?.salaryMax || null,
-                    salaryCurrency: jobDetails?.salaryCurrency || null,
-                    status: "NEW",
-                  },
-                });
-                jobsDiscovered++;
-              }
-            }
-          }
-        } else if (classification.category === "APPLICATIONS") {
-          const company = inferredCompany;
-          const role = inferredRole;
-
-          let existingApp = await prisma.jobApplication.findFirst({
-            where: {
-              userId: user.id,
-              company: { equals: company, mode: "insensitive" },
-            }
-          });
-
-          if (!existingApp) {
-            existingApp = await prisma.jobApplication.create({
-              data: {
-                userId: user.id,
-                company,
-                role: role || "Software Role",
-                status: "APPLIED",
-                source: "Gmail Sync",
-                sourceEmailId: savedEmail.id,
-              }
-            });
-            applicationsDiscovered++;
-          }
-          linkedJobAppId = existingApp.id;
-        } else if (classification.category === "INTERVIEWS") {
-          const interviewDetails = await extractInterviewDetails(subject, snippet);
-          const company = inferredCompany;
-          const title = inferredRole;
-
-          let existingApp = await prisma.jobApplication.findFirst({
-            where: {
-              userId: user.id,
-              company: { equals: company, mode: "insensitive" },
-            },
-            orderBy: { createdAt: 'desc' }
-          });
-
-          if (existingApp) {
-            await prisma.jobApplication.update({
-              where: { id: existingApp.id },
-              data: { status: "INTERVIEW" }
-            });
-          } else {
-            existingApp = await prisma.jobApplication.create({
-              data: {
-                userId: user.id,
-                company,
-                role: title,
-                status: "INTERVIEW",
-                source: "Gmail Sync",
-                sourceEmailId: savedEmail.id,
-              }
-            });
-            applicationsDiscovered++;
-          }
-          linkedJobAppId = existingApp.id;
-
-          const scheduledAt = interviewDetails?.date ? new Date(interviewDetails.date) : new Date(Date.now() + 86400000 * 2);
-          if (!isNaN(scheduledAt.getTime())) {
-            await prisma.interview.create({
-              data: {
-                userId: user.id,
-                company,
-                position: title,
-                scheduledAt,
-                location: interviewDetails?.location || null,
-                meetingLink: interviewDetails?.meetingUrl || null,
-                notes: interviewDetails?.instructions || null,
-                applicationId: existingApp.id,
-              }
-            });
-            interviewsDiscovered++;
-          }
-        } else if (classification.category === "REJECTIONS") {
-          const company = inferredCompany;
-          const existingApp = await prisma.jobApplication.findFirst({
-            where: {
-              userId: user.id,
-              company: { equals: company, mode: "insensitive" },
-            }
-          });
-          if (existingApp) {
-            await prisma.jobApplication.update({
-              where: { id: existingApp.id },
-              data: { status: "REJECTED" }
-            });
-            linkedJobAppId = existingApp.id;
-            rejectionsDiscovered++;
-          }
-        } else if (classification.category === "OFFERS") {
-          const company = inferredCompany;
-          const role = inferredRole;
-
-          let existingApp = await prisma.jobApplication.findFirst({
-            where: {
-              userId: user.id,
-              company: { equals: company, mode: "insensitive" },
-            }
-          });
-
-          if (existingApp) {
-            await prisma.jobApplication.update({
-              where: { id: existingApp.id },
-              data: { status: "OFFER" }
-            });
-          } else {
-            existingApp = await prisma.jobApplication.create({
-              data: {
-                userId: user.id,
-                company,
-                role: role || "Job Role",
-                status: "OFFER",
-                source: "Gmail Sync",
-                sourceEmailId: savedEmail.id,
-              }
-            });
-            applicationsDiscovered++;
-          }
-          linkedJobAppId = existingApp.id;
-          offersDiscovered++;
-        }
-
-        // ─── Recruiter Contact Extraction ──────────────────────────────────
-        if (
-          classification.category === "RECRUITERS" &&
-          senderEmail
-        ) {
-          const existingContact = await prisma.recruiterContact.findFirst({
-            where: {
-              userId: user.id,
-              email: { equals: senderEmail, mode: "insensitive" },
-            },
-          });
-
-          if (existingContact) {
-            const sourceIds = existingContact.sourceEmailIds.includes(savedEmail.id)
-              ? existingContact.sourceEmailIds
-              : [...existingContact.sourceEmailIds, savedEmail.id];
-            await prisma.recruiterContact.update({
-              where: { id: existingContact.id },
-              data: {
-                communicationCount: { increment: 1 },
-                lastContactedAt: receivedAt ?? new Date(),
-                sourceEmailIds: sourceIds,
-              },
-            });
-          } else {
-            await prisma.recruiterContact.create({
-              data: {
-                userId: user.id,
-                name: sender || "Unknown",
-                email: senderEmail,
-                company: classification.company?.trim() || null,
-                role: classification.role?.trim() || null,
-                relationship: "RECRUITER",
-                lastContactedAt: receivedAt ?? new Date(),
-                communicationCount: 1,
-                sourceEmailIds: [savedEmail.id],
-              },
-            });
-          }
-        }
-
-        // ─── Career Reminder / Deadline Extraction ───────────────────────────
-        if (classification.category === "INTERVIEWS" || classification.category === "IMPORTANT") {
-          // Create a career reminder for interviews and important deadlines
-          const interviewDetails = classification.category === "INTERVIEWS"
-            ? await extractInterviewDetails(subject, snippet).catch(() => null)
-            : null;
-          const deadlineDate = interviewDetails?.date ? new Date(interviewDetails.date) : null;
-
-          if (deadlineDate && !isNaN(deadlineDate.getTime())) {
-            const reminderType = classification.category === "IMPORTANT" ? "ASSESSMENT_DEADLINE" : "INTERVIEW_DATE";
-            const existingReminder = await prisma.careerReminder.findFirst({
-              where: {
-                userId: user.id,
-                sourceEmailId: savedEmail.id,
-              },
-            });
-
-            if (!existingReminder) {
-              await prisma.careerReminder.create({
-                data: {
-                  userId: user.id,
-                  type: reminderType,
-                  date: deadlineDate,
-                  confidence: classification.confidence,
-                  sourceEmailId: savedEmail.id,
-                  title: classification.summary || subject || "Career deadline",
-                },
-              });
-            }
-          }
-        }
-
-        if (linkedJobAppId) {
-          await prisma.emailMessage.update({
-            where: { id: savedEmail.id },
-            data: { jobApplicationId: linkedJobAppId }
-          });
-        }
-      } catch (msgErr) {
-        // Log but continue processing remaining messages
-        console.error("[gmail-sync] error processing message:", msg.id, msgErr instanceof Error ? msgErr.message : "unknown");
-      }
-    }
-
-    // Update sync timestamp and historyId
-    await prisma.gmailToken.updateMany({
-      where: { userId: user.id },
-      data: {
-        lastSyncedAt: new Date(),
-        ...(newHistoryId ? { historyId: newHistoryId } : {}),
-      },
+    const data = await runGmailSyncForUser(user.id, {
+      forceFullSync: options?.forceFullSync,
     });
-
-    // ─── Memory Extraction ────────────────────────────────────────────────────
-    // Asynchronously extract career signals from job-related emails
-    // e.g. "Recruiter from Google emailed about a Senior React role" → skills, companies
-    try {
-      const jobEmails = await prisma.emailMessage.findMany({
-        where: { userId: user.id, jobRelated: true },
-        orderBy: { receivedAt: "desc" },
-        take: 20,
-        select: { subject: true, sender: true, snippet: true, category: true },
-      });
-
-      if (jobEmails.length > 0) {
-        const memoryText = jobEmails
-          .map(e => `[${e.category}] From: ${e.sender ?? ""} | ${e.subject ?? ""} | ${e.snippet ?? ""}`)
-          .join("\n");
-
-        // Fire-and-forget — don't fail sync if memory extraction fails
-        extractAndStoreMemoryFromGmail(user.id, memoryText).catch(err =>
-          console.error("[gmail-sync] memory extraction error:", err)
-        );
-      }
-    } catch (memErr) {
-      console.error("[gmail-sync] memory extraction setup error:", memErr);
-    }
-
-    revalidatePath("/dashboard");
-    return {
-      success: true,
-      data: {
-        emailsProcessed,
-        jobsDiscovered,
-        applicationsDiscovered,
-        interviewsDiscovered,
-        rejectionsDiscovered,
-        offersDiscovered,
-        syncedAt: new Date()
-      },
-    };
+    revalidateInbox();
+    return { success: true, data };
   } catch (err) {
-    console.error("[gmail-sync] fatal error:", err instanceof Error ? err.message : "unknown");
+    const message = err instanceof Error ? err.message : "unknown";
+    console.error("[gmail-sync] fatal error:", message);
+    if (message.includes("Gmail not connected")) {
+      return { success: false, error: message };
+    }
+    if (message.includes("Failed to fetch Gmail messages")) {
+      return { success: false, error: "Failed to fetch Gmail messages. Please reconnect Gmail." };
+    }
     return { success: false, error: "Unable to sync Gmail right now. Please try again." };
   }
 }
@@ -817,15 +63,15 @@ export async function syncGmailInbox(): Promise<ActionResponse<GmailSyncSummary>
 export async function getInboxStats(): Promise<ActionResponse<Record<string, number>>> {
   try {
     const user = await createOrGetUser();
-    
+
     const stats = await prisma.emailMessage.groupBy({
-      by: ['category'],
+      by: ["category"],
       where: { userId: user.id },
       _count: true,
     });
-    
+
     const allMailCount = await prisma.emailMessage.count({ where: { userId: user.id } });
-    
+
     const result: Record<string, number> = {
       ALL: allMailCount,
       JOB_OPPORTUNITY: 0,
@@ -839,18 +85,17 @@ export async function getInboxStats(): Promise<ActionResponse<Record<string, num
       IMPORTANT: 0,
       OTHER: 0,
     };
-    
+
     for (const stat of stats) {
       if (stat.category && stat.category in result) {
         result[stat.category] = stat._count;
       } else if (stat.category) {
-        // Fallback for old categories if any exist
         result.OTHER += stat._count;
       }
     }
-    
+
     return { success: true, data: result };
-  } catch (err) {
+  } catch {
     return { success: false, error: "Failed to load stats." };
   }
 }
@@ -869,7 +114,7 @@ export async function getInboxEmails(options?: {
 
     const where = {
       userId: user.id,
-      ...(options?.category && options.category !== 'ALL' ? { category: options.category } : {}),
+      ...(options?.category && options.category !== "ALL" ? { category: options.category } : {}),
       ...(options?.jobRelatedOnly ? { jobRelated: true } : {}),
     };
 
@@ -935,7 +180,7 @@ export async function updateDiscoveredJobStatus(
       data: { status },
     });
     if (updated.count === 0) return { success: false, error: "Job not found." };
-    revalidatePath("/dashboard");
+    revalidateInbox();
     return { success: true, data: undefined };
   } catch {
     return { success: false, error: "Failed to update job status." };
@@ -970,36 +215,34 @@ export async function getGmailSyncStatus(): Promise<ActionResponse<{
   }
 }
 
-export async function reprocessGmailEmails(): Promise<ActionResponse<any>> {
+export async function reprocessGmailEmails(): Promise<ActionResponse<{
+  processed: number;
+  jobsDiscovered: number;
+  applicationsDiscovered: number;
+  interviewsDiscovered: number;
+}>> {
   try {
     const user = await createOrGetUser();
-    
-    // Fetch all existing emails
+
     const emails = await prisma.emailMessage.findMany({
       where: { userId: user.id },
-      orderBy: { createdAt: "asc" }
+      orderBy: { createdAt: "asc" },
     });
-    
+
     let processed = 0;
     let jobsDiscovered = 0;
     let applicationsDiscovered = 0;
     let interviewsDiscovered = 0;
-    
+
     for (const msg of emails) {
-      // Just re-run classification and entity extraction
       const subject = msg.subject || "";
       const snippet = msg.snippet || "";
       const limitedBody = (msg.body || "").slice(0, 2500);
       const sender = msg.sender || "";
       const senderEmail = msg.senderEmail || "";
-      
-      let classification;
-      try {
-        classification = await aiClassifyEmail(subject, senderEmail, snippet, limitedBody);
-      } catch (e) {
-        classification = deterministicClassify(`${subject} ${snippet}`);
-      }
-      
+
+      const classification = deterministicClassify(`${subject} ${snippet} ${limitedBody}`);
+
       await prisma.emailMessage.update({
         where: { id: msg.id },
         data: {
@@ -1009,9 +252,9 @@ export async function reprocessGmailEmails(): Promise<ActionResponse<any>> {
           interviewRelated: classification.interviewRelated,
           rejectionRelated: classification.rejectionRelated,
           offerRelated: classification.offerRelated,
-        }
+        },
       });
-      
+
       const { company: inferredCompany, role: inferredRole } = inferCompanyAndRole(
         classification.company,
         classification.role,
@@ -1019,12 +262,11 @@ export async function reprocessGmailEmails(): Promise<ActionResponse<any>> {
         sender,
         senderEmail
       );
-      
-      // Basic entity generation fallback
+
       if (classification.category === "JOB_OPPORTUNITY") {
         if (inferredCompany && inferredRole) {
           const existing = await prisma.discoveredJob.findFirst({
-            where: { userId: user.id, company: { equals: inferredCompany, mode: "insensitive" } }
+            where: { userId: user.id, company: { equals: inferredCompany, mode: "insensitive" } },
           });
           if (!existing) {
             await prisma.discoveredJob.create({
@@ -1033,27 +275,27 @@ export async function reprocessGmailEmails(): Promise<ActionResponse<any>> {
                 sourceEmailId: msg.id,
                 title: inferredRole,
                 company: inferredCompany,
-                status: "NEW"
-              }
+                status: "NEW",
+              },
             });
             jobsDiscovered++;
           }
         }
       } else if (classification.category === "APPLICATIONS") {
         if (inferredCompany) {
-          let app = await prisma.jobApplication.findFirst({
-            where: { userId: user.id, company: { equals: inferredCompany, mode: "insensitive" } }
+          const app = await prisma.jobApplication.findFirst({
+            where: { userId: user.id, company: { equals: inferredCompany, mode: "insensitive" } },
           });
           if (!app) {
-            app = await prisma.jobApplication.create({
+            await prisma.jobApplication.create({
               data: {
                 userId: user.id,
                 company: inferredCompany,
                 role: inferredRole || "Software Role",
                 status: "APPLIED",
                 source: "Gmail Reprocess",
-                sourceEmailId: msg.id
-              }
+                sourceEmailId: msg.id,
+              },
             });
             applicationsDiscovered++;
           }
@@ -1061,7 +303,7 @@ export async function reprocessGmailEmails(): Promise<ActionResponse<any>> {
       } else if (classification.category === "INTERVIEWS") {
         if (inferredCompany) {
           let app = await prisma.jobApplication.findFirst({
-            where: { userId: user.id, company: { equals: inferredCompany, mode: "insensitive" } }
+            where: { userId: user.id, company: { equals: inferredCompany, mode: "insensitive" } },
           });
           if (app) {
             await prisma.jobApplication.update({ where: { id: app.id }, data: { status: "INTERVIEW" } });
@@ -1073,8 +315,8 @@ export async function reprocessGmailEmails(): Promise<ActionResponse<any>> {
                 role: inferredRole || "Software Role",
                 status: "INTERVIEW",
                 source: "Gmail Reprocess",
-                sourceEmailId: msg.id
-              }
+                sourceEmailId: msg.id,
+              },
             });
             applicationsDiscovered++;
           }
@@ -1083,10 +325,11 @@ export async function reprocessGmailEmails(): Promise<ActionResponse<any>> {
       }
       processed++;
     }
-    
+
+    revalidateInbox();
     return {
       success: true,
-      data: { processed, jobsDiscovered, applicationsDiscovered, interviewsDiscovered }
+      data: { processed, jobsDiscovered, applicationsDiscovered, interviewsDiscovered },
     };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "Failed to reprocess emails" };

@@ -151,7 +151,7 @@ export function EmailDigestPanel() {
 
   function handleSync() {
     startSync(async () => {
-      const res = await syncGmailInbox();
+      const res = await syncGmailInbox({ forceFullSync: (syncStatus?.emailCount ?? 0) === 0 });
       if (res.success && res.data) {
         toast.success(`Synced ${res.data.emailsProcessed} emails.`);
         await loadStatusAndStats();

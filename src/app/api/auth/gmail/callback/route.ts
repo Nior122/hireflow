@@ -76,6 +76,9 @@ export async function GET(req: NextRequest) {
         expiryDate: tokens.expiry_date
           ? new Date(tokens.expiry_date)
           : new Date(Date.now() + 3_600_000),
+        // Reconnect must not keep a stale history cursor from a prior account/sync.
+        historyId: null,
+        lastSyncedAt: null,
       },
       create: {
         userId: dbUser.id,
@@ -84,6 +87,8 @@ export async function GET(req: NextRequest) {
         expiryDate: tokens.expiry_date
           ? new Date(tokens.expiry_date)
           : new Date(Date.now() + 3_600_000),
+        historyId: null,
+        lastSyncedAt: null,
       },
     });
 

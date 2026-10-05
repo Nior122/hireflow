@@ -3,6 +3,8 @@
  * Allows switching between Groq, OpenAI, Anthropic, etc.
  */
 
+import { groqFetch } from "@/lib/ai/groq";
+
 export interface AIProvider {
   id: string;
   name: string;
@@ -21,29 +23,16 @@ export interface ChatOptions {
   maxTokens?: number;
 }
 
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama3-8b-8192";
-
 export class GroqProvider implements AIProvider {
   id = "groq";
   name = "Groq";
 
   async chat(messages: ChatMessage[], options?: ChatOptions): Promise<string> {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) throw new Error("GROQ_API_KEY not configured");
-
-    const response = await fetch(GROQ_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: options?.model ?? GROQ_MODEL,
-        messages,
-        temperature: options?.temperature ?? 0.3,
-        max_tokens: options?.maxTokens ?? 2048,
-      }),
+    const response = await groqFetch({
+      model: options?.model,
+      messages,
+      temperature: options?.temperature ?? 0.3,
+      max_tokens: options?.maxTokens ?? 2048,
     });
 
     if (!response.ok) throw new Error(`Groq API error: ${response.status}`);
@@ -52,22 +41,12 @@ export class GroqProvider implements AIProvider {
   }
 
   async *streamChat(messages: ChatMessage[], options?: ChatOptions): AsyncGenerator<string> {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) throw new Error("GROQ_API_KEY not configured");
-
-    const response = await fetch(GROQ_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: options?.model ?? GROQ_MODEL,
-        messages,
-        temperature: options?.temperature ?? 0.3,
-        max_tokens: options?.maxTokens ?? 2048,
-        stream: true,
-      }),
+    const response = await groqFetch({
+      model: options?.model,
+      messages,
+      temperature: options?.temperature ?? 0.3,
+      max_tokens: options?.maxTokens ?? 2048,
+      stream: true,
     });
 
     if (!response.ok) throw new Error(`Groq API error: ${response.status}`);
@@ -99,7 +78,6 @@ export class GroqProvider implements AIProvider {
   }
 }
 
-// Provider registry
 const providers = new Map<string, AIProvider>();
 
 export function registerProvider(provider: AIProvider) {
@@ -113,5 +91,4 @@ export function getProvider(id?: string): AIProvider {
   return provider;
 }
 
-// Initialize default providers
 registerProvider(new GroqProvider());

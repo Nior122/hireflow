@@ -1,4 +1,5 @@
 import { GroqProvider } from "@/lib/ai/providers";
+import { getGroqApiKey } from "@/lib/ai/groq";
 import { z } from "zod";
 
 // Schema for Job Extraction
@@ -31,8 +32,7 @@ function parseJsonFromLlm(raw: string): any {
 }
 
 export async function extractJobDetails(subject: string, snippet: string): Promise<JobExtraction | null> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return null;
+  if (!getGroqApiKey() && process.env.DEMO_MODE !== "true") return null;
 
   const prompt = `Extract structured job details from this email. Only output JSON matching the schema. No markdown, no text.
 Email Subject: ${subject}
@@ -73,8 +73,7 @@ export const InterviewExtractionSchema = z.object({
 export type InterviewExtraction = z.infer<typeof InterviewExtractionSchema>;
 
 export async function extractInterviewDetails(subject: string, snippet: string): Promise<InterviewExtraction | null> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return null;
+  if (!getGroqApiKey() && process.env.DEMO_MODE !== "true") return null;
 
   const prompt = `Extract interview details from this email. Only output JSON matching the schema.
 Email Subject: ${subject}

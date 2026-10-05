@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { createOrGetUser } from "@/lib/clerk";
-import { getValidGmailToken } from "@/actions/gmail-sync";
+import { getValidGmailToken } from "@/lib/gmail/tokens";
 import { prisma } from "@/lib/prisma";
 import { GroqProvider } from "@/lib/ai/providers";
 
@@ -218,23 +218,27 @@ export async function GET(req: Request) {
           senderEmail
         );
 
-        const savedEmail = await prisma.emailMessage.upsert({
-          where: { gmailMessageId: msg.id },
-          create: {
-            userId: user.id,
-            gmailMessageId: msg.id,
-            sender: sender || null,
-            senderEmail: senderEmail || null,
-            recipients: to || null,
-            subject: subject || null,
-            snippet: snippet.slice(0, 500) || null,
-            body: limitedBody || null,
-            category: classification.category,
-          },
-          update: {
-            category: classification.category,
-          }
+        const existingEmail = await prisma.emailMessage.findFirst({
+          where: { userId: user.id, gmailMessageId: msg.id },
         });
+        const savedEmail = existingEmail
+          ? await prisma.emailMessage.update({
+              where: { id: existingEmail.id },
+              data: { category: classification.category },
+            })
+          : await prisma.emailMessage.create({
+              data: {
+                userId: user.id,
+                gmailMessageId: msg.id,
+                sender: sender || null,
+                senderEmail: senderEmail || null,
+                recipients: to || null,
+                subject: subject || null,
+                snippet: snippet.slice(0, 500) || null,
+                body: limitedBody || null,
+                category: classification.category,
+              },
+            });
         diagnostics.emailMessagesStored++;
         diagnostics.categoryCounts[classification.category] = (diagnostics.categoryCounts[classification.category] || 0) + 1;
 

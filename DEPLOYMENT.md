@@ -1,59 +1,82 @@
 # Deployment Guide
 
-HireFlow is built on Next.js 16 (App Router) and is optimized for deployment on Vercel.
+HireFlow is a Next.js 16 App Router app. Vercel is the recommended host.
 
-## 1. Vercel Deployment (Recommended)
+## 1. Deploy on Vercel
 
-The easiest way to deploy HireFlow is using the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme).
+1. Push this branch / merge the PR into `master`.
+2. Import the GitHub repo in [Vercel](https://vercel.com/new).
+3. Framework preset: **Next.js**. Build command is `prisma generate && next build`.
+4. Add the environment variables below (Production + Preview).
+5. Deploy.
+6. Against the production database, run once:
 
-1. Push your code to a GitHub, GitLab, or Bitbucket repository.
-2. Import the project into Vercel.
-3. Configure the Environment Variables (see below).
-4. Click Deploy.
+```bash
+npx prisma db push
+```
 
-Vercel will automatically configure the build settings (`npm run build`) and output directory (`.next`).
+That applies the per-user Gmail message unique index (`EmailMessage` `@@unique([userId, gmailMessageId])`).
 
-## 2. Environment Variables Required
-
-Ensure you set the following environment variables in your deployment environment:
+## 2. Environment variables
 
 ```env
-# App Configuration
+# App
 NEXT_PUBLIC_APP_URL=https://your-domain.com
 
-# Database (PostgreSQL / Supabase / Neon)
-DATABASE_URL="postgres://user:password@host:port/db?sslmode=require"
+# Database (Neon, Supabase, or Vercel Postgres)
+DATABASE_URL=postgresql://user:password@host:5432/db?sslmode=require
 
-# Clerk Authentication
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
+# Clerk
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
+CLERK_SECRET_KEY=sk_live_...
 NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
 
-# Groq AI
+# Groq — model is required; nothing is hardcoded in the app
 GROQ_API_KEY=gsk_...
+GROQ_MODEL=llama-3.3-70b-versatile
 
-# Stripe Billing (if enabled)
-STRIPE_SECRET_KEY=sk_test_...
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+# Gmail / Calendar OAuth
+GOOGLE_CLIENT_ID=....apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-...
+GOOGLE_REDIRECT_URI=https://your-domain.com/api/auth/gmail/callback
+GOOGLE_CALENDAR_REDIRECT_URI=https://your-domain.com/api/auth/calendar/callback
+
+# Cron (Vercel Cron sends Authorization: Bearer $CRON_SECRET)
+CRON_SECRET=a-long-random-string
+
+# Stripe (optional)
+STRIPE_SECRET_KEY=sk_live_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
-## 3. Database Migrations on Deploy
+Do **not** set `DEMO_MODE` or `NEXT_PUBLIC_DEMO_MODE` on Vercel.
 
-To ensure your database schema is up-to-date, add a `postinstall` script to your `package.json`:
+### Google Cloud Console
 
-```json
-"scripts": {
-  "postinstall": "prisma generate"
-}
-```
+Authorized redirect URIs must include:
 
-Then, manually run `npx prisma db push` against your production database from your local machine, or configure a CI/CD pipeline step to run `npx prisma migrate deploy`.
+- `https://your-domain.com/api/auth/gmail/callback`
+- `https://your-domain.com/api/auth/calendar/callback`
+- Vercel preview URLs if you test OAuth on previews, e.g. `https://<project>-<team>.vercel.app/api/auth/gmail/callback`
 
-## 4. Alternate Deployment (Docker)
+Enable **Gmail API** (and Calendar API if used).
 
-If you prefer to deploy using Docker on AWS/GCP/DigitalOcean:
-1. Create a standard Next.js `Dockerfile`.
-2. Ensure you build the app using `standalone` output mode in `next.config.mjs`.
-3. Set the environment variables in your container orchestrator.
+### Clerk
+
+Add the Vercel domain under Clerk → Allowed origins / redirect URLs.
+
+## 3. After first deploy
+
+1. `npx prisma db push` (or `npx prisma migrate deploy` once migrations are used).
+2. Connect Gmail in Settings.
+3. Click **Sync Inbox** — recent inbox mail should import into HireFlow.
+
+Gmail is also synced once a day at 08:00 UTC via `vercel.json` cron (`/api/cron/gmail-sync`). Vercel Hobby only allows daily crons; on Pro you can change the schedule to run more often. Set `CRON_SECRET`. Manual **Sync Inbox** still works anytime.
+
+## 4. Alternate (Docker)
+
+Use a standard Next.js Dockerfile, `output: "standalone"` in `next.config.ts`, and inject the same env vars.
