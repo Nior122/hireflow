@@ -85,3 +85,11 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - Rotate API keys periodically
 - Review Google OAuth scopes regularly
 - Monitor Stripe webhook logs for failures
+
+### Stripe subscriptions
+
+Configure `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTHLY`, and `STRIPE_PRICE_PRO_YEARLY` with real Stripe values (`price_...` for prices). Set `NEXT_PUBLIC_APP_URL` to the public application origin. Other paid tiers require the corresponding `STRIPE_PRICE_<TIER>_<MONTHLY|YEARLY>` environment variables. Register `/api/webhooks/stripe` as a Stripe endpoint; webhook requests require a valid timestamped signature. Checkout and billing portal require live Stripe configuration; there are no local checkout placeholders.
+
+### Application documents and reminders
+
+Application uploads are stored inline in `JobApplication.otherDocuments` (maximum 10 files, 1.5 MB each); account for database growth and access controls before enabling at scale. Browser interview notifications work only while HireFlow is open, after the user opts in and grants browser permission; they are not service-worker push messages.

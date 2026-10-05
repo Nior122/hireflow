@@ -18,6 +18,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { checkout } from "@/actions/billing";
+import { getReminderPreferences, setReminderPreferences } from "@/actions/reminders";
 import { getGmailSyncStatus, syncGmailInbox } from "@/actions/gmail-sync";
 import { LinkedInImport } from "./LinkedInImport";
 import { toast } from "sonner";
@@ -30,6 +32,8 @@ export function SettingsDashboard() {
     jobsDiscovered: number;
   } | null>(null);
   
+  const [remindersEnabled, setRemindersEnabled] = useState(false);
+  useEffect(() => { getReminderPreferences().then(p => setRemindersEnabled(p.enabled)); }, []);
   const [loading, setLoading] = useState(true);
   const [isSyncing, startSync] = useTransition();
 
@@ -274,7 +278,7 @@ export function SettingsDashboard() {
                 <p className="text-sm text-muted-foreground max-w-sm">
                   You are currently on the free tier. Upgrade to Pro for unlimited AI extractions and premium support.
                 </p>
-                <Button className="mt-4 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 shadow-md">
+                <Button onClick={async () => { const result = await checkout("pro", "month"); if (result.success && result.data?.url) window.location.assign(result.data.url); else toast.error(result.success ? "Stripe checkout unavailable" : result.error); }} className="mt-4 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 shadow-md">
                   Upgrade to Pro
                 </Button>
               </div>
@@ -312,9 +316,10 @@ export function SettingsDashboard() {
                     <Label className="text-base">Interview Reminders</Label>
                     <p className="text-xs text-muted-foreground">Get notified 24h before an upcoming interview.</p>
                   </div>
-                  <div className="w-10 h-6 bg-primary rounded-full relative cursor-pointer">
-                    <div className="w-4 h-4 bg-white rounded-full absolute right-1 top-1"></div>
-                  </div>
+                  <Button variant="outline" onClick={async () => {
+                    if (!remindersEnabled && 'Notification' in window && await Notification.requestPermission() !== 'granted') { toast.error('Allow browser notifications first'); return; }
+                    await setReminderPreferences(!remindersEnabled); setRemindersEnabled(!remindersEnabled);
+                  }}>{remindersEnabled ? 'On' : 'Off'}</Button>
                 </div>
               </div>
             </CardContent>

@@ -51,3 +51,14 @@ export async function deleteReminder(id: string): Promise<ActionResponse<void>> 
     return { success: true, data: undefined };
   } catch { return { success: false, error: "Failed" }; }
 }
+
+export async function getReminderPreferences(): Promise<{ enabled: boolean }> {
+  const user = await createOrGetUser();
+  const prefs = user.notificationPrefs as { interviewReminders?: boolean } | null;
+  return { enabled: prefs?.interviewReminders === true };
+}
+export async function setReminderPreferences(enabled: boolean): Promise<void> {
+  const user = await createOrGetUser();
+  const previous = (user.notificationPrefs && typeof user.notificationPrefs === 'object' && !Array.isArray(user.notificationPrefs)) ? user.notificationPrefs as Record<string, unknown> : {};
+  await prisma.user.update({ where: { id: user.id }, data: { notificationPrefs: { ...previous, interviewReminders: enabled } } });
+}

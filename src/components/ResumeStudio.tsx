@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { getResumes, createResume, deleteResume, duplicateResume, setDefaultResume } from "@/actions/resume-studio";
+import { CreateCvWizard } from "./CreateCvWizard";
 import { ResumeBuilder } from "./ResumeBuilder";
 
 interface ResumeItem {
@@ -31,6 +32,7 @@ interface ResumeItem {
 export function ResumeStudio() {
   const [resumes, setResumes] = useState<ResumeItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -93,6 +95,8 @@ export function ResumeStudio() {
 
   return (
     <div className="space-y-6">
+      <Button onClick={() => setWizardOpen(v => !v)}>Create full CV with AI</Button>
+      {wizardOpen && <CreateCvWizard onCreated={() => { loadResumes(); }} />}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2"><FileText className="h-6 w-6 text-primary" /> Resume Studio</h1>

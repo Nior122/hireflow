@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireDbUser } from "@/lib/clerk";
 import { groqChatJson, getGroqApiKey } from "@/lib/ai/groq";
+import { toPlainText } from "@/lib/ai/plain";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
@@ -83,11 +84,11 @@ export async function POST(req: NextRequest) {
         const parsed = JSON.parse(content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
         return Response.json({ result: parsed });
       } catch {
-        return Response.json({ result: content });
+        return Response.json({ result: toPlainText(content) });
       }
     }
 
-    return Response.json({ result: content });
+    return Response.json({ result: toPlainText(content) });
   } catch (e) {
     console.error("Resume AI error:", e);
     return Response.json({ error: "Internal error" }, { status: 500 });

@@ -25,22 +25,22 @@ export const PLANS: PlanDefinition[] = [
     limits: { applications: 5, aiRequests: 10, exports: 2, candidates: 0, apiRequests: 0, teamMembers: 1, webhooks: 0 },
   },
   {
-    id: "pro", name: "Pro", tier: "individual", priceMonthly: 19, priceYearly: 190, stripePriceIdMonthly: "price_pro_monthly", stripePriceIdYearly: "price_pro_yearly",
+    id: "pro", name: "Pro", tier: "individual", priceMonthly: 19, priceYearly: 190,
     features: ["Unlimited Applications", "Resume Studio", "AI Copilot", "Interview Center", "100 AI Requests/day", "10 Exports/month", "Job Discovery"],
     limits: { applications: -1, aiRequests: 100, exports: 10, candidates: 0, apiRequests: 1000, teamMembers: 1, webhooks: 5 },
   },
   {
-    id: "premium", name: "Premium", tier: "individual", priceMonthly: 39, priceYearly: 390, stripePriceIdMonthly: "price_premium_monthly", stripePriceIdYearly: "price_premium_yearly",
+    id: "premium", name: "Premium", tier: "individual", priceMonthly: 39, priceYearly: 390,
     features: ["Everything in Pro", "Unlimited AI", "Unlimited Exports", "Priority Support", "Browser Extension", "Mobile App Premium"],
     limits: { applications: -1, aiRequests: -1, exports: -1, candidates: 0, apiRequests: 5000, teamMembers: 1, webhooks: 20 },
   },
   {
-    id: "team", name: "Team", tier: "business", priceMonthly: 79, priceYearly: 790, stripePriceIdMonthly: "price_team_monthly", stripePriceIdYearly: "price_team_yearly",
+    id: "team", name: "Team", tier: "business", priceMonthly: 79, priceYearly: 790,
     features: ["5 Team Members", "ATS Pipeline", "Team Collaboration", "Basic Analytics", "500 AI Requests/day"],
     limits: { applications: -1, aiRequests: 500, exports: 50, candidates: 500, apiRequests: 10000, teamMembers: 5, webhooks: 10 },
   },
   {
-    id: "business", name: "Business", tier: "business", priceMonthly: 199, priceYearly: 1990, stripePriceIdMonthly: "price_business_monthly", stripePriceIdYearly: "price_business_yearly",
+    id: "business", name: "Business", tier: "business", priceMonthly: 199, priceYearly: 1990,
     features: ["25 Team Members", "Advanced Analytics", "Custom Branding", "Webhooks", "API Access", "Priority Support"],
     limits: { applications: -1, aiRequests: -1, exports: -1, candidates: -1, apiRequests: 50000, teamMembers: 25, webhooks: 50 },
   },

@@ -1,9 +1,12 @@
 import { NextRequest } from "next/server";
+import { verifyStripeSignature } from "@/lib/billing/stripe";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const raw = await req.text();
+    if (!verifyStripeSignature(raw, req.headers.get("stripe-signature"), process.env.STRIPE_WEBHOOK_SECRET ?? "")) return Response.json({ error: "Invalid signature" }, { status: 400 });
+    const body = JSON.parse(raw);
     const event = body.type;
     const data = body.data?.object;
 
@@ -14,10 +17,11 @@ export async function POST(req: NextRequest) {
     switch (event) {
       case "checkout.session.completed":
         if (data?.metadata?.userId && data?.subscription) {
-          await prisma.subscription.update({
+          await prisma.subscription.upsert({
             where: { userId: data.metadata.userId },
-            data: { stripeSubId: data.subscription, status: "ACTIVE" },
-          }).catch(() => {});
+            create: { userId: data.metadata.userId, stripeSubId: data.subscription, stripeCustomerId: data.customer, plan: data.metadata.plan?.toUpperCase() ?? "PRO", status: "ACTIVE" },
+            update: { stripeSubId: data.subscription, stripeCustomerId: data.customer, plan: data.metadata.plan?.toUpperCase() ?? "PRO", status: "ACTIVE" },
+          });
         }
         break;
 
