@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { createOrGetUser } from '@/lib/clerk';
 import { groqChatJson } from '@/lib/ai/groq';
+import { toPlainText } from '@/lib/ai/plain';
 import { analyzeAts, resumeToText } from '@/lib/resume/ats';
 
 const inputSchema = z.object({ name: z.string().trim().min(2).max(120), email: z.email(), role: z.string().trim().min(2).max(120), skills: z.string().max(2000), experience: z.string().max(6000), education: z.string().max(3000) });
@@ -18,6 +19,9 @@ export async function createFullCv(input: z.infer<typeof inputSchema>) {
   let cv: z.infer<typeof cvSchema>;
   try { cv = cvSchema.parse(JSON.parse(result.content.replace(/^```(?:json)?|```$/gm, '').trim())); }
   catch { throw new Error('AI returned an invalid CV. Please try again.'); }
+  cv = { title: toPlainText(cv.title), summary: toPlainText(cv.summary), skills: cv.skills.map(toPlainText),
+    experience: cv.experience.map(item => ({ title: toPlainText(item.title), description: toPlainText(item.description) })),
+    education: cv.education.map(item => ({ title: toPlainText(item.title), description: toPlainText(item.description) })) };
   const sections = [
     { type: 'EXPERIENCE' as const, title: 'Work Experience', order: 0, content: { items: cv.experience } },
     { type: 'EDUCATION' as const, title: 'Education', order: 1, content: { items: cv.education } },

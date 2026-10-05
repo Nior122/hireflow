@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { subscribeToReminders, unsubscribeFromReminders } from "@/lib/reminder-subscribe";
 import { checkout } from "@/actions/billing";
 import { getReminderPreferences, setReminderPreferences } from "@/actions/reminders";
 import { getGmailSyncStatus, syncGmailInbox } from "@/actions/gmail-sync";
@@ -317,8 +318,18 @@ export function SettingsDashboard() {
                     <p className="text-xs text-muted-foreground">Get notified 24h before an upcoming interview.</p>
                   </div>
                   <Button variant="outline" onClick={async () => {
-                    if (!remindersEnabled && 'Notification' in window && await Notification.requestPermission() !== 'granted') { toast.error('Allow browser notifications first'); return; }
-                    await setReminderPreferences(!remindersEnabled); setRemindersEnabled(!remindersEnabled);
+                    try {
+                      if (!remindersEnabled) {
+                        if (!('Notification' in window) || await Notification.requestPermission() !== 'granted') throw new Error('Allow browser notifications first');
+                        await setReminderPreferences(true);
+                        try { await subscribeToReminders(); } catch (e) { await setReminderPreferences(false); throw e; }
+                        setRemindersEnabled(true);
+                      } else {
+                        await setReminderPreferences(false);
+                        await unsubscribeFromReminders();
+                        setRemindersEnabled(false);
+                      }
+                    } catch (e) { toast.error(e instanceof Error ? e.message : 'Could not update reminders'); }
                   }}>{remindersEnabled ? 'On' : 'Off'}</Button>
                 </div>
               </div>

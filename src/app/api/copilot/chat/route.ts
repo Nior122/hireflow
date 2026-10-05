@@ -1,3 +1,4 @@
+import { plainGroqReply } from "@/lib/ai/plain";
 import { NextRequest } from "next/server";
 import { requireDbUser } from "@/lib/clerk";
 import { prisma } from "@/lib/prisma";
@@ -125,7 +126,6 @@ export async function POST(req: NextRequest) {
                 // Handle content
                 if (delta.content) {
                   contentBuffer += delta.content;
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "text", content: delta.content })}\n\n`));
                 }
 
                 if (choice.finish_reason === "stop" && contentBuffer) {
@@ -134,6 +134,8 @@ export async function POST(req: NextRequest) {
               } catch {}
             }
           }
+
+          if (contentBuffer) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "text", content: plainGroqReply(contentBuffer) })}\n\n`));
 
           // Process tool calls if any
           if (toolCallsBuffer.length > 0) {
@@ -180,6 +182,7 @@ export async function POST(req: NextRequest) {
               if (fuReader) {
                 const fuDecoder = new TextDecoder();
                 let fuBuffer = "";
+                let fuText = "";
                 while (true) {
                   const { done, value } = await fuReader.read();
                   if (done) break;
@@ -193,10 +196,11 @@ export async function POST(req: NextRequest) {
                     try {
                       const p = JSON.parse(d);
                       const c = p.choices?.[0]?.delta?.content;
-                      if (c) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "text", content: c })}\n\n`));
+                      if (c) fuText += c;
                     } catch {}
                   }
                 }
+                if (fuText) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "text", content: plainGroqReply(fuText) })}\n\n`));
               }
             }
           }

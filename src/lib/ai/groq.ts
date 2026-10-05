@@ -1,3 +1,4 @@
+import { plainGroqReply } from "./plain";
 import { GROQ_API_URL, getGroqModel } from "@/lib/ai-config";
 
 export function getGroqApiKey(): string | null {
@@ -116,7 +117,7 @@ export async function groqFetch(
 
   let model: string;
   try {
-    model = getGroqModel(typeof payload.model === "string" ? payload.model : undefined);
+    model = getGroqModel();
   } catch {
     return Response.json({ error: "AI is not configured. Set GROQ_MODEL." }, { status: 500 });
   }
@@ -172,6 +173,6 @@ export async function groqChatJson(payload: Record<string, unknown>): Promise<{
   return {
     ok: true,
     status: 200,
-    content: data.choices?.[0]?.message?.content ?? "",
+    content: plainGroqReply(data.choices?.[0]?.message?.content ?? ""),
   };
 }

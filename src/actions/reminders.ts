@@ -59,6 +59,27 @@ export async function getReminderPreferences(): Promise<{ enabled: boolean }> {
 }
 export async function setReminderPreferences(enabled: boolean): Promise<void> {
   const user = await createOrGetUser();
-  const previous = (user.notificationPrefs && typeof user.notificationPrefs === 'object' && !Array.isArray(user.notificationPrefs)) ? user.notificationPrefs as Record<string, unknown> : {};
-  await prisma.user.update({ where: { id: user.id }, data: { notificationPrefs: { ...previous, interviewReminders: enabled } } });
+  const { parseNotificationPrefs } = await import('@/lib/reminder-push');
+  const previous = parseNotificationPrefs(user.notificationPrefs);
+  await prisma.user.update({ where: { id: user.id }, data: { notificationPrefs: { ...previous, interviewReminders: enabled, subscriptions: enabled ? previous.subscriptions : [] } } });
+}
+
+export async function saveReminderPushSubscription(subscription: unknown): Promise<void> {
+  const { isSubscription, parseNotificationPrefs } = await import('@/lib/reminder-push');
+  if (!isSubscription(subscription)) throw new Error('Invalid push subscription');
+  const user = await createOrGetUser();
+  const prefs = parseNotificationPrefs(user.notificationPrefs);
+  if (!prefs.interviewReminders) throw new Error('Enable reminders first');
+  await prisma.user.update({ where: { id: user.id }, data: {
+    notificationPrefs: { ...prefs, subscriptions: [...(prefs.subscriptions ?? []).filter(s => s.endpoint !== subscription.endpoint), subscription].slice(-5) },
+  } });
+}
+
+export async function removeReminderPushSubscription(endpoint: string): Promise<void> {
+  const { parseNotificationPrefs } = await import('@/lib/reminder-push');
+  const user = await createOrGetUser();
+  const prefs = parseNotificationPrefs(user.notificationPrefs);
+  await prisma.user.update({ where: { id: user.id }, data: {
+    notificationPrefs: { ...prefs, subscriptions: (prefs.subscriptions ?? []).filter(s => s.endpoint !== endpoint) },
+  } });
 }

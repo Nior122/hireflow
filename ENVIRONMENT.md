@@ -92,4 +92,4 @@ Configure `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTHL
 
 ### Application documents and reminders
 
-Application uploads are stored inline in `JobApplication.otherDocuments` (maximum 10 files, 1.5 MB each); account for database growth and access controls before enabling at scale. Browser interview notifications work only while HireFlow is open, after the user opts in and grants browser permission; they are not service-worker push messages.
+Application uploads are stored inline in `JobApplication.otherDocuments` (maximum 10 files, 1.5 MB each); account for database growth and access controls before enabling at scale. Interview reminders use service-worker Web Push and a daily protected cron (`/api/cron/reminders`). Configure `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (a `mailto:` contact or HTTPS URL), and `CRON_SECRET`. Users must opt in and grant browser notification permission. The cron runs at 08:00 UTC and sends for interviews due within the next 24 hours; delivery depends on browser push service availability.

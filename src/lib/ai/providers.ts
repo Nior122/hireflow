@@ -3,6 +3,7 @@
  * Allows switching between Groq, OpenAI, Anthropic, etc.
  */
 
+import { plainGroqReply } from "@/lib/ai/plain";
 import { groqFetch } from "@/lib/ai/groq";
 
 export interface AIProvider {
@@ -37,7 +38,7 @@ export class GroqProvider implements AIProvider {
 
     if (!response.ok) throw new Error(`Groq API error: ${response.status}`);
     const data = await response.json();
-    return data.choices?.[0]?.message?.content ?? "";
+    return plainGroqReply(data.choices?.[0]?.message?.content ?? "");
   }
 
   async *streamChat(messages: ChatMessage[], options?: ChatOptions): AsyncGenerator<string> {
@@ -56,6 +57,7 @@ export class GroqProvider implements AIProvider {
 
     const decoder = new TextDecoder();
     let buffer = "";
+    let fullText = "";
 
     while (true) {
       const { done, value } = await reader.read();
@@ -67,14 +69,16 @@ export class GroqProvider implements AIProvider {
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
         const data = line.slice(6).trim();
-        if (data === "[DONE]") return;
+        if (data === "[DONE]") break;
         try {
           const parsed = JSON.parse(data);
           const content = parsed.choices?.[0]?.delta?.content;
-          if (content) yield content;
+          if (content) fullText += content;
         } catch {}
       }
     }
+    if (buffer.startsWith("data: ")) { try { fullText += JSON.parse(buffer.slice(6)).choices?.[0]?.delta?.content ?? ""; } catch {} }
+    if (fullText) yield plainGroqReply(fullText);
   }
 }
 
