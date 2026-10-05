@@ -1,5 +1,6 @@
 'use client';
 
+import { ReviewInbox } from "./ReviewInbox";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
@@ -21,7 +22,7 @@ export function EmployerDashboard({ userId }: Props) {
   const [candidates, setCandidates] = useState<CandidateCard[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDigest, setShowDigest] = useState(false);
-  const [tab, setTab] = useState<"pipeline" | "team">("pipeline");
+  const [tab, setTab] = useState<"pipeline" | "team" | "review">("pipeline");
 
   useEffect(() => {
     import("@/actions/candidates").then(({ getCandidates }) => {
@@ -64,6 +65,7 @@ export function EmployerDashboard({ userId }: Props) {
         <div className="flex items-center gap-2">
           <div className="flex gap-1 p-1 bg-muted/50 rounded-lg">
             <Button variant={tab === "pipeline" ? "default" : "ghost"} size="sm" className="h-7 text-xs gap-1" onClick={() => setTab("pipeline")}>Pipeline</Button>
+            <Button variant={tab === "review" ? "default" : "ghost"} size="sm" onClick={() => setTab("review")}>Review inbox</Button>
             <Button variant={tab === "team" ? "default" : "ghost"} size="sm" className="h-7 text-xs gap-1" onClick={() => setTab("team")}><UserCog className="h-3 w-3" /> Team</Button>
           </div>
           {tab === "pipeline" && (
@@ -79,7 +81,7 @@ export function EmployerDashboard({ userId }: Props) {
         </div>
       </div>
 
-      {tab === "team" ? (
+      {tab === "review" ? <ReviewInbox /> : tab === "team" ? (
         <TeamDashboard />
       ) : (
         <>

@@ -149,7 +149,7 @@ async function upsertEmailForUser(
   if (existing) {
     return prisma.emailMessage.update({
       where: { id: existing.id },
-      data: classificationFields,
+      data: existing.action === "DISMISSED" ? { ...classificationFields, action: "DISMISSED" } : classificationFields,
     });
   }
 
@@ -191,7 +191,7 @@ async function upsertEmailForUser(
     if (conflict?.userId === userId) {
       return prisma.emailMessage.update({
         where: { id: conflict.id },
-        data: classificationFields,
+        data: conflict.action === "DISMISSED" ? { ...classificationFields, action: "DISMISSED" } : classificationFields,
       });
     }
 

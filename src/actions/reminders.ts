@@ -1,5 +1,6 @@
 'use server';
 
+import { prismaJson } from "@/lib/prisma-json";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { createOrGetUser } from "@/lib/clerk";
@@ -50,4 +51,36 @@ export async function deleteReminder(id: string): Promise<ActionResponse<void>> 
     revalidatePath("/dashboard");
     return { success: true, data: undefined };
   } catch { return { success: false, error: "Failed" }; }
+}
+
+export async function getReminderPreferences(): Promise<{ enabled: boolean }> {
+  const user = await createOrGetUser();
+  const prefs = user.notificationPrefs as { interviewReminders?: boolean } | null;
+  return { enabled: prefs?.interviewReminders === true };
+}
+export async function setReminderPreferences(enabled: boolean): Promise<void> {
+  const user = await createOrGetUser();
+  const { parseNotificationPrefs } = await import('@/lib/reminder-push');
+  const previous = parseNotificationPrefs(user.notificationPrefs);
+  await prisma.user.update({ where: { id: user.id }, data: { notificationPrefs: prismaJson({ ...previous, interviewReminders: enabled, subscriptions: enabled ? previous.subscriptions : [] }) } });
+}
+
+export async function saveReminderPushSubscription(subscription: unknown): Promise<void> {
+  const { isSubscription, parseNotificationPrefs } = await import('@/lib/reminder-push');
+  if (!isSubscription(subscription)) throw new Error('Invalid push subscription');
+  const user = await createOrGetUser();
+  const prefs = parseNotificationPrefs(user.notificationPrefs);
+  if (!prefs.interviewReminders) throw new Error('Enable reminders first');
+  await prisma.user.update({ where: { id: user.id }, data: {
+    notificationPrefs: prismaJson({ ...prefs, subscriptions: [...(prefs.subscriptions ?? []).filter(s => s.endpoint !== subscription.endpoint), subscription].slice(-5) }),
+  } });
+}
+
+export async function removeReminderPushSubscription(endpoint: string): Promise<void> {
+  const { parseNotificationPrefs } = await import('@/lib/reminder-push');
+  const user = await createOrGetUser();
+  const prefs = parseNotificationPrefs(user.notificationPrefs);
+  await prisma.user.update({ where: { id: user.id }, data: {
+    notificationPrefs: prismaJson({ ...prefs, subscriptions: (prefs.subscriptions ?? []).filter(s => s.endpoint !== endpoint) }),
+  } });
 }

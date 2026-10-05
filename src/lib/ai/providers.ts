@@ -3,6 +3,7 @@
  * Allows switching between Groq, OpenAI, Anthropic, etc.
  */
 
+import { plainGroqReply } from "@/lib/ai/plain";
 import { groqFetch } from "@/lib/ai/groq";
 
 export interface AIProvider {
@@ -23,9 +24,9 @@ export interface ChatOptions {
   maxTokens?: number;
 }
 
-export class GroqProvider implements AIProvider {
-  id = "groq";
-  name = "Groq";
+export class OpenAICompatibleProvider implements AIProvider {
+  id = "configured";
+  name = "Configured AI provider";
 
   async chat(messages: ChatMessage[], options?: ChatOptions): Promise<string> {
     const response = await groqFetch({
@@ -35,9 +36,9 @@ export class GroqProvider implements AIProvider {
       max_tokens: options?.maxTokens ?? 2048,
     });
 
-    if (!response.ok) throw new Error(`Groq API error: ${response.status}`);
+    if (!response.ok) throw new Error(`AI provider error: ${response.status}`);
     const data = await response.json();
-    return data.choices?.[0]?.message?.content ?? "";
+    return plainGroqReply(data.choices?.[0]?.message?.content ?? "");
   }
 
   async *streamChat(messages: ChatMessage[], options?: ChatOptions): AsyncGenerator<string> {
@@ -49,13 +50,14 @@ export class GroqProvider implements AIProvider {
       stream: true,
     });
 
-    if (!response.ok) throw new Error(`Groq API error: ${response.status}`);
+    if (!response.ok) throw new Error(`AI provider error: ${response.status}`);
 
     const reader = response.body?.getReader();
     if (!reader) return;
 
     const decoder = new TextDecoder();
     let buffer = "";
+    let fullText = "";
 
     while (true) {
       const { done, value } = await reader.read();
@@ -67,14 +69,16 @@ export class GroqProvider implements AIProvider {
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
         const data = line.slice(6).trim();
-        if (data === "[DONE]") return;
+        if (data === "[DONE]") break;
         try {
           const parsed = JSON.parse(data);
           const content = parsed.choices?.[0]?.delta?.content;
-          if (content) yield content;
+          if (content) fullText += content;
         } catch {}
       }
     }
+    if (buffer.startsWith("data: ")) { try { fullText += JSON.parse(buffer.slice(6)).choices?.[0]?.delta?.content ?? ""; } catch {} }
+    if (fullText) yield plainGroqReply(fullText);
   }
 }
 
@@ -85,10 +89,13 @@ export function registerProvider(provider: AIProvider) {
 }
 
 export function getProvider(id?: string): AIProvider {
-  const providerId = id ?? "groq";
+  const providerId = id ?? "configured";
   const provider = providers.get(providerId);
   if (!provider) throw new Error(`AI provider ${providerId} not registered`);
   return provider;
 }
 
-registerProvider(new GroqProvider());
+registerProvider(new OpenAICompatibleProvider());
+
+/** Backwards-compatible alias used by existing extraction code. */
+export { OpenAICompatibleProvider as GroqProvider };

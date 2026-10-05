@@ -148,6 +148,17 @@ export function StatsSection({ applications }: Props) {
       {/* Insights Tab */}
       {tab === "insights" && insights && (
         <>
+          <Card className="mb-4"><CardHeader><CardTitle>Application activity · last 12 weeks</CardTitle></CardHeader><CardContent>
+            <div className="grid grid-cols-12 gap-1" aria-label="12 week application activity heatmap">
+              {Array.from({ length: 12 }, (_, week) => <div key={week} className="grid grid-rows-7 gap-1">
+                {Array.from({ length: 7 }, (_, day) => {
+                  const date = new Date(); date.setHours(0,0,0,0); date.setDate(date.getDate() - (83 - week * 7 - day));
+                  const count = applications.filter(a => new Date(a.createdAt).toDateString() === date.toDateString()).length;
+                  return <div key={day} title={`${date.toDateString()}: ${count} applications`} className={`h-4 rounded-sm ${count === 0 ? 'bg-muted' : count === 1 ? 'bg-emerald-300' : count < 4 ? 'bg-emerald-500' : 'bg-emerald-700'}`} />;
+                })}
+              </div>)}
+            </div>
+          </CardContent></Card>
           <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-4">
             <Card>
               <CardHeader className="pb-2"><CardDescription className="flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Response Rate</CardDescription></CardHeader>

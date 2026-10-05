@@ -1,25 +1,12 @@
-import { getGroqModel } from "./ai-config";
-
-describe("getGroqModel", () => {
-  const original = process.env.GROQ_MODEL;
-
-  afterEach(() => {
-    if (original === undefined) delete process.env.GROQ_MODEL;
-    else process.env.GROQ_MODEL = original;
-  });
-
-  it("reads the model from GROQ_MODEL", () => {
-    process.env.GROQ_MODEL = "my-env-model";
-    expect(getGroqModel()).toBe("my-env-model");
-  });
-
-  it("prefers an explicit override", () => {
-    process.env.GROQ_MODEL = "env-model";
-    expect(getGroqModel("override-model")).toBe("override-model");
-  });
-
-  it("throws when the env var is missing", () => {
-    delete process.env.GROQ_MODEL;
-    expect(() => getGroqModel()).toThrow(/GROQ_MODEL is not set/);
-  });
-});
+import { getAiConfig, getAiConnection } from './ai-config';
+const vars = ['AI_PROVIDER','AI_API_KEY','AI_MODEL','AI_BASE_URL','GROQ_API_KEY','GROQ_MODEL','OPENROUTER_API_KEY','OPENROUTER_MODEL','OPENAI_API_KEY','OPENAI_MODEL'] as const;
+const previous = Object.fromEntries(vars.map(v => [v, process.env[v]]));
+beforeEach(() => { for (const v of vars) delete process.env[v]; });
+afterAll(() => { for (const v of vars) { if (previous[v] === undefined) delete process.env[v]; else process.env[v] = previous[v]; } });
+test('Groq from environment only', () => { process.env.GROQ_API_KEY='key'; process.env.GROQ_MODEL='env-model'; expect(getAiConfig()).toMatchObject({provider:'groq',model:'env-model',baseUrl:'https://api.groq.com/openai/v1'}); });
+test('OpenRouter from environment only', () => { process.env.OPENROUTER_API_KEY='key'; process.env.OPENROUTER_MODEL='account/model'; expect(getAiConfig()).toMatchObject({provider:'openrouter',model:'account/model'}); });
+test('OpenAI from environment only', () => { process.env.OPENAI_API_KEY='key'; process.env.OPENAI_MODEL='env-model'; expect(getAiConfig()).toMatchObject({provider:'openai',model:'env-model'}); });
+test('Custom OpenAI-compatible endpoint with arbitrary model', () => { process.env.AI_PROVIDER='custom'; process.env.AI_API_KEY='key'; process.env.AI_MODEL='chosen/model'; process.env.AI_BASE_URL='https://ai.example.com/v1'; expect(getAiConfig()).toMatchObject({provider:'custom',model:'chosen/model'}); });
+test('Model lookup works before model is set', () => { process.env.GROQ_API_KEY='key'; expect(getAiConnection().provider).toBe('groq'); expect(() => getAiConfig()).toThrow(/GROQ_MODEL/); });
+test('Multiple keys require explicit provider choice', () => { process.env.GROQ_API_KEY='key'; process.env.OPENAI_API_KEY='key'; expect(() => getAiConfig()).toThrow(/Multiple AI providers/); process.env.AI_PROVIDER='openai'; process.env.AI_MODEL='selected'; expect(getAiConfig().provider).toBe('openai'); });
+test('Reject unsafe custom URL', () => { process.env.AI_PROVIDER='custom'; process.env.AI_API_KEY='key'; process.env.AI_MODEL='chosen'; process.env.AI_BASE_URL='http://localhost:3000'; expect(() => getAiConfig()).toThrow(/HTTPS/); });

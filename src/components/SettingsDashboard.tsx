@@ -18,6 +18,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getAiConfigurationStatus, getAvailableAiModels, testAiConnection } from "@/actions/ai-status";
+import { subscribeToReminders, unsubscribeFromReminders } from "@/lib/reminder-subscribe";
+import { checkout } from "@/actions/billing";
+import { getReminderPreferences, setReminderPreferences } from "@/actions/reminders";
 import { getGmailSyncStatus, syncGmailInbox } from "@/actions/gmail-sync";
 import { LinkedInImport } from "./LinkedInImport";
 import { toast } from "sonner";
@@ -30,6 +34,17 @@ export function SettingsDashboard() {
     jobsDiscovered: number;
   } | null>(null);
   
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [testingAi, setTestingAi] = useState(false);
+  const [aiTestResult, setAiTestResult] = useState<{ok:boolean;message:string} | null>(null);
+  const [modelsError, setModelsError] = useState<string | null>(null);
+  const [aiStatus, setAiStatus] = useState<Awaited<ReturnType<typeof getAiConfigurationStatus>> | null>(null);
+  useEffect(() => {
+    getAiConfigurationStatus().then(setAiStatus).catch(() => {});
+    getAvailableAiModels().then(result => { setAvailableModels(result.models); setModelsError(result.error ?? null); }).catch(() => setModelsError('Unable to load provider models.'));
+  }, []);
+  const [remindersEnabled, setRemindersEnabled] = useState(false);
+  useEffect(() => { getReminderPreferences().then(p => setRemindersEnabled(p.enabled)); }, []);
   const [loading, setLoading] = useState(true);
   const [isSyncing, startSync] = useTransition();
 
@@ -74,6 +89,12 @@ export function SettingsDashboard() {
         </h2>
       </div>
 
+      {aiStatus && <div className="rounded-lg border p-3 text-sm" role="status">
+        <strong>AI runtime status:</strong> provider key {aiStatus.keyConfigured ? 'available' : 'missing'}; model {aiStatus.modelConfigured ? 'available' : 'missing'}
+        {' '}in {aiStatus.environment}{aiStatus.deployment ? ` (deploy ${aiStatus.deployment})` : ''}.
+        {!aiStatus.modelConfigured && <p className="text-muted-foreground mt-1">{aiStatus.error ?? "Configure an AI provider and model in Vercel."} Redeploy after changing Vercel variables.</p>}
+        <Button type="button" variant="ghost" size="sm" className="ml-2" onClick={() => getAiConfigurationStatus().then(setAiStatus).catch(() => toast.error('Cannot check AI configuration'))}>Refresh</Button>
+      </div>}
       <Tabs defaultValue="profile" className="space-y-6">
         <div className="overflow-x-auto pb-2">
           <TabsList className="w-full justify-start h-12 p-1 bg-muted/50 backdrop-blur-xl border border-border/50 rounded-xl">
@@ -84,7 +105,7 @@ export function SettingsDashboard() {
               <LinkIcon className="h-4 w-4" /> Integrations
             </TabsTrigger>
             <TabsTrigger value="ai" className="gap-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              <Brain className="h-4 w-4" /> AI & Groq
+              <Brain className="h-4 w-4" /> AI Provider
             </TabsTrigger>
             <TabsTrigger value="billing" className="gap-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <CreditCard className="h-4 w-4" /> Billing
@@ -217,40 +238,39 @@ export function SettingsDashboard() {
                 Configure the LLM models that power your automated extractions and insights.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4 p-4 rounded-xl border border-border/50 bg-background/50">
-                <div className="grid gap-2">
-                  <Label htmlFor="groq-key">Groq API Key</Label>
-                  <div className="flex gap-2">
-                    <Input id="groq-key" type="password" placeholder="gsk_..." className="font-mono bg-muted/50" />
-                    <Button variant="outline">Verify</Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Your key is stored securely and only used for your job extractions.
-                  </p>
-                </div>
+            <CardContent className="space-y-4">
+              <p className="text-sm">AI provider credentials are configured in Vercel, not entered or stored in this page.</p>
+              <div className="rounded-lg border p-4 text-sm space-y-2" role="status">
+                <p>Provider: <strong>{aiStatus?.provider ?? "Checking…"}</strong> · API key: <strong>{aiStatus?.keyConfigured ? 'Available to server' : 'Not available to this deployment'}</strong></p>
+                <p>Active model from the server environment: <strong>{aiStatus?.model ?? 'Not available to this deployment'}</strong></p>
+                {aiStatus && <p className="text-muted-foreground">Environment: {aiStatus.environment}{aiStatus.deployment ? ` · deploy ${aiStatus.deployment}` : ''}</p>}
+                {!aiStatus?.modelConfigured && <p className="text-amber-600">{aiStatus?.error ?? "AI is not configured."} Check Vercel Preview/Production and branch scope, then redeploy.</p>}
               </div>
-              
-              <div className="space-y-4 p-4 rounded-xl border border-border/50 bg-background/50">
-                <h4 className="font-medium text-sm">Model Preferences</h4>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="p-3 border border-primary/20 rounded-lg bg-primary/5 cursor-pointer hover:bg-primary/10 transition-colors">
-                    <h5 className="font-medium flex justify-between items-center text-sm">
-                      Llama 3 8B
-                      <CheckCircle2 className="w-4 h-4 text-primary" />
-                    </h5>
-                    <p className="text-xs text-muted-foreground mt-1">Faster, great for basic extraction.</p>
-                  </div>
-                  <div className="p-3 border border-border/50 rounded-lg bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors">
-                    <h5 className="font-medium text-sm">Llama 3 70B</h5>
-                    <p className="text-xs text-muted-foreground mt-1">More accurate, best for complex emails.</p>
-                  </div>
-                </div>
+              <div className="rounded-lg border p-4 space-y-2">
+                <h4 className="font-medium text-sm">Models available from the configured provider</h4>
+                <p className="text-xs text-muted-foreground">Live list from the provider; the server uses the selected provider and model from environment variables, never a model picked by this page.</p>
+                {modelsError && <p className="text-sm text-destructive">{modelsError}</p>}
+                {!modelsError && !availableModels.length && <p className="text-sm text-muted-foreground">No models returned yet.</p>}
+                <ul className="grid gap-2 sm:grid-cols-2 text-sm">
+                  {availableModels.map(id => <li key={id} className="rounded border px-3 py-2 break-all">{id}{aiStatus?.model === id && <span className="ml-2 text-emerald-600">Active</span>}</li>)}
+                </ul>
               </div>
+              <div className="space-y-2">
+                <Button type="button" disabled={testingAi} onClick={async () => {
+                  setTestingAi(true); setAiTestResult(null);
+                  try { setAiTestResult(await testAiConnection()); }
+                  catch { setAiTestResult({ ok: false, message: 'Could not test AI connection.' }); }
+                  finally { setTestingAi(false); }
+                }}>{testingAi ? 'Testing live response…' : 'Test AI connection'}</Button>
+                {aiTestResult && <p role="status" className={aiTestResult.ok ? 'text-sm text-emerald-600' : 'text-sm text-destructive'}>{aiTestResult.message}</p>}
+              </div>
+              <Button type="button" variant="outline" onClick={async () => {
+                try {
+                  const [status, result] = await Promise.all([getAiConfigurationStatus(), getAvailableAiModels()]);
+                  setAiStatus(status); setAvailableModels(result.models); setModelsError(result.error ?? null);
+                } catch { toast.error('Unable to refresh AI status.'); }
+              }}>Refresh AI status</Button>
             </CardContent>
-            <CardFooter className="bg-muted/20 border-t border-border/50">
-              <Button>Save AI Settings</Button>
-            </CardFooter>
           </Card>
         </TabsContent>
 
@@ -274,7 +294,7 @@ export function SettingsDashboard() {
                 <p className="text-sm text-muted-foreground max-w-sm">
                   You are currently on the free tier. Upgrade to Pro for unlimited AI extractions and premium support.
                 </p>
-                <Button className="mt-4 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 shadow-md">
+                <Button onClick={async () => { const result = await checkout("pro", "month"); if (result.success && result.data?.url) window.location.assign(result.data.url); else toast.error(result.success ? "Stripe checkout unavailable" : result.error); }} className="mt-4 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 shadow-md">
                   Upgrade to Pro
                 </Button>
               </div>
@@ -312,9 +332,20 @@ export function SettingsDashboard() {
                     <Label className="text-base">Interview Reminders</Label>
                     <p className="text-xs text-muted-foreground">Get notified 24h before an upcoming interview.</p>
                   </div>
-                  <div className="w-10 h-6 bg-primary rounded-full relative cursor-pointer">
-                    <div className="w-4 h-4 bg-white rounded-full absolute right-1 top-1"></div>
-                  </div>
+                  <Button variant="outline" onClick={async () => {
+                    try {
+                      if (!remindersEnabled) {
+                        if (!('Notification' in window) || await Notification.requestPermission() !== 'granted') throw new Error('Allow browser notifications first');
+                        await setReminderPreferences(true);
+                        try { await subscribeToReminders(); } catch (e) { await setReminderPreferences(false); throw e; }
+                        setRemindersEnabled(true);
+                      } else {
+                        await setReminderPreferences(false);
+                        await unsubscribeFromReminders();
+                        setRemindersEnabled(false);
+                      }
+                    } catch (e) { toast.error(e instanceof Error ? e.message : 'Could not update reminders'); }
+                  }}>{remindersEnabled ? 'On' : 'Off'}</Button>
                 </div>
               </div>
             </CardContent>

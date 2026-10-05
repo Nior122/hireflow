@@ -162,7 +162,7 @@ export async function GET(req: Request) {
     const listData = await listRes.json();
     const messageList: { id: string }[] = listData.messages ?? [];
 
-    let diagnostics = {
+    const diagnostics = {
       gmailMessagesFetched: messageList.length,
       emailMessagesStored: 0,
       categoryCounts: {} as Record<string, number>,

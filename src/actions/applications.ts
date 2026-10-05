@@ -121,3 +121,50 @@ export async function moveApplication(id: string, newStatus: ApplicationStatus, 
     return { success: true, data: undefined };
   } catch { return { success: false, error: "Failed to move application" }; }
 }
+
+export async function uploadApplicationDocument(id: string, formData: FormData): Promise<ActionResponse<{ id: string; name: string }>> {
+  try {
+    const { validateDocument, documentsFromJson } = await import('@/lib/documents');
+    const user = await createOrGetUser();
+    const app = await prisma.jobApplication.findFirst({ where: { id, userId: user.id } });
+    if (!app) return { success: false, error: 'Application not found' };
+    const file = formData.get('file');
+    if (!(file instanceof File)) return { success: false, error: 'Choose a file' };
+    if (file.size > 1_500_000) return { success: false, error: 'File exceeds 1.5 MB' };
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    validateDocument(file.name, file.type, bytes);
+    const doc = { id: crypto.randomUUID(), name: file.name, mime: file.type, size: bytes.length, base64: Buffer.from(bytes).toString('base64') };
+    const docs = documentsFromJson(app.otherDocuments);
+    if (docs.length >= 10) return { success: false, error: 'Maximum 10 documents' };
+    await prisma.jobApplication.update({ where: { id }, data: { otherDocuments: [...docs, doc] } });
+    revalidatePath('/dashboard');
+    return { success: true, data: { id: doc.id, name: doc.name } };
+  } catch (e) { return { success: false, error: e instanceof Error ? e.message : 'Upload failed' }; }
+}
+
+export async function getApplicationDocuments(id: string): Promise<ActionResponse<{ id: string; name: string; mime: string; size: number }[]>> {
+  const { documentsFromJson } = await import('@/lib/documents');
+  const user = await createOrGetUser();
+  const app = await prisma.jobApplication.findFirst({ where: { id, userId: user.id }, select: { otherDocuments: true } });
+  if (!app) return { success: false, error: 'Application not found' };
+  return { success: true, data: documentsFromJson(app.otherDocuments).map(({ id, name, mime, size }) => ({ id, name, mime, size })) };
+}
+
+export async function downloadApplicationDocument(id: string, documentId: string): Promise<ActionResponse<{ name: string; mime: string; base64: string }>> {
+  const { documentsFromJson } = await import('@/lib/documents');
+  const user = await createOrGetUser();
+  const app = await prisma.jobApplication.findFirst({ where: { id, userId: user.id }, select: { otherDocuments: true } });
+  const doc = documentsFromJson(app?.otherDocuments).find(d => d.id === documentId);
+  if (!doc) return { success: false, error: 'Document not found' };
+  return { success: true, data: { name: doc.name, mime: doc.mime, base64: doc.base64 } };
+}
+
+export async function deleteApplicationDocument(id: string, documentId: string): Promise<ActionResponse<void>> {
+  const { documentsFromJson } = await import('@/lib/documents');
+  const user = await createOrGetUser();
+  const app = await prisma.jobApplication.findFirst({ where: { id, userId: user.id } });
+  if (!app) return { success: false, error: 'Application not found' };
+  await prisma.jobApplication.update({ where: { id }, data: { otherDocuments: documentsFromJson(app.otherDocuments).filter(d => d.id !== documentId) } });
+  revalidatePath('/dashboard');
+  return { success: true, data: undefined };
+}

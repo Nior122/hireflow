@@ -18,7 +18,12 @@
 | Variable | Type | Description | How to Obtain |
 |----------|------|-------------|---------------|
 | `GROQ_API_KEY` | String | Groq AI API key | console.groq.com/keys |
-| `GROQ_MODEL` | String | Groq model id (no default in code) | console.groq.com/docs/models |
+| `GROQ_MODEL` | String | Groq model ID (no default in code) | console.groq.com/docs/models |
+| `AI_PROVIDER` | String | Select `groq`, `openrouter`, `openai`, or `custom`; required when multiple keys exist | Vercel environment |
+| `AI_MODEL` | String | Preferred model ID, overrides provider-specific model variable | Provider models API |
+| `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | String | OpenRouter-compatible chat API | openrouter.ai |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | String | OpenAI-compatible chat API | platform.openai.com |
+| `AI_API_KEY` / `AI_BASE_URL` | String | Custom HTTPS OpenAI-compatible `/v1` provider (requires `AI_PROVIDER=custom`) | Your provider |
 
 ### Google Integration
 | Variable | Type | Description | How to Obtain |
@@ -85,3 +90,11 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - Rotate API keys periodically
 - Review Google OAuth scopes regularly
 - Monitor Stripe webhook logs for failures
+
+### Stripe subscriptions
+
+Configure `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTHLY`, and `STRIPE_PRICE_PRO_YEARLY` with real Stripe values (`price_...` for prices). Set `NEXT_PUBLIC_APP_URL` to the public application origin. Other paid tiers require the corresponding `STRIPE_PRICE_<TIER>_<MONTHLY|YEARLY>` environment variables. Register `/api/webhooks/stripe` as a Stripe endpoint; webhook requests require a valid timestamped signature. Checkout and billing portal require live Stripe configuration; there are no local checkout placeholders.
+
+### Application documents and reminders
+
+Application uploads are stored inline in `JobApplication.otherDocuments` (maximum 10 files, 1.5 MB each); account for database growth and access controls before enabling at scale. Interview reminders use service-worker Web Push and a daily protected cron (`/api/cron/reminders`). Configure `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (a `mailto:` contact or HTTPS URL), and `CRON_SECRET`. Users must opt in and grant browser notification permission. The cron runs at 08:00 UTC and sends for interviews due within the next 24 hours; delivery depends on browser push service availability.

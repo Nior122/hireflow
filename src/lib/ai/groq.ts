@@ -1,9 +1,9 @@
-import { GROQ_API_URL, getGroqModel } from "@/lib/ai-config";
+import { plainGroqReply } from "./plain";
+import { getAiConfig, getAiConnection } from "@/lib/ai-config";
 
+/** Legacy name retained for callsites; checks whichever provider is configured. */
 export function getGroqApiKey(): string | null {
-  const key = process.env.GROQ_API_KEY?.trim();
-  if (!key || key === "placeholder") return null;
-  return key;
+  try { return getAiConnection().apiKey; } catch { return null; }
 }
 
 function lastUserText(payload: Record<string, unknown>): string {
@@ -108,29 +108,23 @@ export async function groqFetch(
   payload: Record<string, unknown>,
   options?: { timeoutMs?: number }
 ): Promise<Response> {
-  const apiKey = getGroqApiKey();
-  if (!apiKey) {
-    if (process.env.DEMO_MODE === "true") return demoResponse(payload);
-    return Response.json({ error: "AI is not configured. Set GROQ_API_KEY." }, { status: 500 });
-  }
-
-  let model: string;
-  try {
-    model = getGroqModel(typeof payload.model === "string" ? payload.model : undefined);
-  } catch {
-    return Response.json({ error: "AI is not configured. Set GROQ_MODEL." }, { status: 500 });
+  let config;
+  try { config = getAiConfig(); }
+  catch (e) {
+    if (process.env.DEMO_MODE === "true" && process.env.NODE_ENV !== "production") return demoResponse(payload);
+    return Response.json({ error: e instanceof Error ? e.message : 'AI provider is not configured' }, { status: 503 });
   }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options?.timeoutMs ?? 30_000);
   try {
-    const response = await fetch(GROQ_API_URL, {
+    const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${config.apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ ...payload, model }),
+      body: JSON.stringify({ ...payload, model: config.model }),
       signal: controller.signal,
     });
 
@@ -144,7 +138,7 @@ export async function groqFetch(
       return Response.json({ error: lastBody.slice(0, 500) }, { status: response.status });
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Groq request timed out";
+    const message = err instanceof Error ? err.message : "AI provider request timed out";
     return Response.json({ error: message }, { status: 504 });
   } finally {
     clearTimeout(timer);
@@ -172,6 +166,6 @@ export async function groqChatJson(payload: Record<string, unknown>): Promise<{
   return {
     ok: true,
     status: 200,
-    content: data.choices?.[0]?.message?.content ?? "",
+    content: plainGroqReply(data.choices?.[0]?.message?.content ?? ""),
   };
 }

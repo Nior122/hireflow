@@ -1,4 +1,4 @@
-import { GroqProvider } from "@/lib/ai/providers";
+import { OpenAICompatibleProvider } from "@/lib/ai/providers";
 import { getGroqApiKey } from "@/lib/ai/groq";
 import { z } from "zod";
 
@@ -52,7 +52,7 @@ Email Snippet: ${snippet}
 }`;
 
   try {
-    const provider = new GroqProvider();
+    const provider = new OpenAICompatibleProvider();
     const response = await provider.chat([{ role: "user", content: prompt }], { temperature: 0.1, maxTokens: 512 });
     return JobExtractionSchema.parse(parseJsonFromLlm(response));
   } catch (err) {
@@ -88,7 +88,7 @@ Email Snippet: ${snippet}
 }`;
 
   try {
-    const provider = new GroqProvider();
+    const provider = new OpenAICompatibleProvider();
     const response = await provider.chat([{ role: "user", content: prompt }], { temperature: 0.1, maxTokens: 512 });
     return InterviewExtractionSchema.parse(parseJsonFromLlm(response));
   } catch (err) {

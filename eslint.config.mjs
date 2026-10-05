@@ -16,6 +16,10 @@ const eslintConfig = defineConfig([
     // Generated files
     "node_modules/**",
     "prisma/migrations/**",
+    // CommonJS bootstrap and manual diagnostic scripts use require by design.
+    "jest.setup.js",
+    "scripts/prisma-pg-shim.cjs",
+    "test.js",
   ]),
   {
     rules: {

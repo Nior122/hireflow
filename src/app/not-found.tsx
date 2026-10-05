@@ -12,7 +12,7 @@ export default function NotFound() {
       <h1 className="text-7xl font-bold tracking-tight mb-4 text-gradient">404</h1>
       <h2 className="text-2xl font-semibold mb-3">Page Not Found</h2>
       <p className="text-muted-foreground max-w-md mx-auto mb-8 text-sm leading-relaxed">
-        The page you are looking for doesn't exist or has been moved. Let's get you back on track.
+        The page you are looking for doesn&apos;t exist or has been moved. Let&apos;s get you back on track.
       </p>
       <Link href="/dashboard">
         <Button size="lg" className="gap-2">

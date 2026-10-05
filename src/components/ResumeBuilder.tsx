@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { updateResume, updateSection, addSection, deleteSection, reorderSections, createVersion } from "@/actions/resume-studio";
 import { analyzeAts, resumeToText } from "@/lib/resume/ats";
 import { RESUME_TEMPLATES } from "@/lib/resume/templates";
+import { exportResume } from "@/actions/resume-export";
 import { ResumePreview } from "./ResumePreview";
 import { AiAssistantPanel } from "./AiAssistantPanel";
 import { AtsPanel } from "./AtsPanel";
@@ -86,6 +87,16 @@ export function ResumeBuilder({ resume: initial, onBack }: Props) {
     reorderSections(newSections.map(s => s.id));
   }
 
+  async function download(format: 'txt' | 'pdf' | 'docx') {
+    await handleSave();
+    const base64 = await exportResume(resume.id, format);
+    const content = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    const mime = format === 'pdf' ? 'application/pdf' : format === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'text/plain';
+    const url = URL.createObjectURL(new Blob([content], { type: mime }));
+    const link = document.createElement('a'); link.href = url; link.download = `${name.replace(/[^a-z0-9_-]/gi, '_') || 'resume'}.${format}`; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] -mx-4 -mt-8">
       {/* Top Bar */}
@@ -100,6 +111,7 @@ export function ResumeBuilder({ resume: initial, onBack }: Props) {
             <Button variant={rightPanel === "ai" ? "default" : "ghost"} size="sm" className="h-7 text-xs gap-1" onClick={() => setRightPanel("ai")}><Sparkles className="h-3 w-3" /> AI</Button>
             <Button variant={rightPanel === "templates" ? "default" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setRightPanel("templates")}>Style</Button>
           </div>
+          {(['pdf', 'docx', 'txt'] as const).map(format => <Button key={format} size="sm" variant="outline" onClick={() => download(format)}>{format.toUpperCase()}</Button>)}
           <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1">
             {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
             {saving ? "Saving..." : "Save"}

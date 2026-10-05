@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { toast } from "sonner";
 import { FileText, Upload, Paperclip, Save } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { updateApplication } from "@/actions/applications";
+import { uploadApplicationDocument, getApplicationDocuments, downloadApplicationDocument, deleteApplicationDocument, updateApplication } from "@/actions/applications";
 import type { ApplicationCard } from "@/lib/types";
 
 interface Props {
@@ -34,6 +34,19 @@ export function DocumentManager({ application, open, onOpenChange }: Props) {
     });
   }
 
+  const [docs, setDocs] = useState<{id:string; name:string; mime:string; size:number}[]>([]);
+  useEffect(() => { if (open) getApplicationDocuments(application.id).then(r => setDocs(r.success ? r.data : [])); }, [open, application.id]);
+  async function upload(file: File) {
+    const data = new FormData(); data.set('file', file);
+    const result = await uploadApplicationDocument(application.id, data);
+    if (!result.success) toast.error(result.error); else { toast.success('Uploaded'); const r = await getApplicationDocuments(application.id); setDocs(r.success ? r.data : []); }
+  }
+  async function download(id: string) {
+    const r = await downloadApplicationDocument(application.id, id);
+    if (!r.success || !r.data) { toast.error(r.success ? "Document unavailable" : r.error); return; }
+    const url = URL.createObjectURL(new Blob([Uint8Array.from(atob(r.data.base64), c => c.charCodeAt(0))], { type: r.data.mime }));
+    const a = document.createElement('a'); a.href = url; a.download = r.data.name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
   const hasDocs = application.resumeFileName || application.coverLetterFileName;
 
   return (
@@ -74,6 +87,10 @@ export function DocumentManager({ application, open, onOpenChange }: Props) {
           </div>
         )}
 
+        <div className="space-y-2">
+          <Input type="file" accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp" onChange={e => { const f=e.target.files?.[0]; if(f) void upload(f); e.target.value=''; }} />
+          {docs.map(d => <div key={d.id} className="flex justify-between text-sm"><button onClick={() => download(d.id)}>{d.name}</button><button onClick={async () => { await deleteApplicationDocument(application.id,d.id); setDocs(v=>v.filter(x=>x.id!==d.id)); }}>Delete</button></div>)}
+        </div>
         <form action={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label className="text-sm flex items-center gap-1.5"><FileText className="h-3.5 w-3.5" /> Resume Filename</Label>
