@@ -18,7 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getAiConfigurationStatus } from "@/actions/ai-status";
+import { getAiConfigurationStatus, getAvailableGroqModels } from "@/actions/ai-status";
 import { subscribeToReminders, unsubscribeFromReminders } from "@/lib/reminder-subscribe";
 import { checkout } from "@/actions/billing";
 import { getReminderPreferences, setReminderPreferences } from "@/actions/reminders";
@@ -34,8 +34,13 @@ export function SettingsDashboard() {
     jobsDiscovered: number;
   } | null>(null);
   
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [modelsError, setModelsError] = useState<string | null>(null);
   const [aiStatus, setAiStatus] = useState<Awaited<ReturnType<typeof getAiConfigurationStatus>> | null>(null);
-  useEffect(() => { getAiConfigurationStatus().then(setAiStatus).catch(() => {}); }, []);
+  useEffect(() => {
+    getAiConfigurationStatus().then(setAiStatus).catch(() => {});
+    getAvailableGroqModels().then(result => { setAvailableModels(result.models); setModelsError(result.error ?? null); }).catch(() => setModelsError('Unable to load Groq models.'));
+  }, []);
   const [remindersEnabled, setRemindersEnabled] = useState(false);
   useEffect(() => { getReminderPreferences().then(p => setRemindersEnabled(p.enabled)); }, []);
   const [loading, setLoading] = useState(true);
@@ -231,40 +236,30 @@ export function SettingsDashboard() {
                 Configure the LLM models that power your automated extractions and insights.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4 p-4 rounded-xl border border-border/50 bg-background/50">
-                <div className="grid gap-2">
-                  <Label htmlFor="groq-key">Groq API Key</Label>
-                  <div className="flex gap-2">
-                    <Input id="groq-key" type="password" placeholder="gsk_..." className="font-mono bg-muted/50" />
-                    <Button variant="outline">Verify</Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Your key is stored securely and only used for your job extractions.
-                  </p>
-                </div>
+            <CardContent className="space-y-4">
+              <p className="text-sm">Groq credentials are configured in Vercel, not entered or stored in this page.</p>
+              <div className="rounded-lg border p-4 text-sm space-y-2" role="status">
+                <p>API key: <strong>{aiStatus?.keyConfigured ? 'Available to server' : 'Not available to this deployment'}</strong></p>
+                <p>Active model from <code>GROQ_MODEL</code>: <strong>{aiStatus?.model ?? 'Not available to this deployment'}</strong></p>
+                {aiStatus && <p className="text-muted-foreground">Environment: {aiStatus.environment}{aiStatus.deployment ? ` · deploy ${aiStatus.deployment}` : ''}</p>}
+                {!aiStatus?.modelConfigured && <p className="text-amber-600">The running server cannot read GROQ_MODEL. Check Vercel Preview/Production and branch scope, then redeploy after updating it.</p>}
               </div>
-              
-              <div className="space-y-4 p-4 rounded-xl border border-border/50 bg-background/50">
-                <h4 className="font-medium text-sm">Model Preferences</h4>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="p-3 border border-primary/20 rounded-lg bg-primary/5 cursor-pointer hover:bg-primary/10 transition-colors">
-                    <h5 className="font-medium flex justify-between items-center text-sm">
-                      Llama 3 8B
-                      <CheckCircle2 className="w-4 h-4 text-primary" />
-                    </h5>
-                    <p className="text-xs text-muted-foreground mt-1">Faster, great for basic extraction.</p>
-                  </div>
-                  <div className="p-3 border border-border/50 rounded-lg bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors">
-                    <h5 className="font-medium text-sm">Llama 3 70B</h5>
-                    <p className="text-xs text-muted-foreground mt-1">More accurate, best for complex emails.</p>
-                  </div>
-                </div>
+              <div className="rounded-lg border p-4 space-y-2">
+                <h4 className="font-medium text-sm">Models available from your Groq account</h4>
+                <p className="text-xs text-muted-foreground">Live list from Groq; availability does not select a model. The server uses only the GROQ_MODEL environment variable.</p>
+                {modelsError && <p className="text-sm text-destructive">{modelsError}</p>}
+                {!modelsError && !availableModels.length && <p className="text-sm text-muted-foreground">No models returned yet.</p>}
+                <ul className="grid gap-2 sm:grid-cols-2 text-sm">
+                  {availableModels.map(id => <li key={id} className="rounded border px-3 py-2 break-all">{id}{aiStatus?.model === id && <span className="ml-2 text-emerald-600">Active</span>}</li>)}
+                </ul>
               </div>
+              <Button type="button" variant="outline" onClick={async () => {
+                try {
+                  const [status, result] = await Promise.all([getAiConfigurationStatus(), getAvailableGroqModels()]);
+                  setAiStatus(status); setAvailableModels(result.models); setModelsError(result.error ?? null);
+                } catch { toast.error('Unable to refresh Groq status.'); }
+              }}>Refresh Groq status</Button>
             </CardContent>
-            <CardFooter className="bg-muted/20 border-t border-border/50">
-              <Button>Save AI Settings</Button>
-            </CardFooter>
           </Card>
         </TabsContent>
 
