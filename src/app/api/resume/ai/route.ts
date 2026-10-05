@@ -1,27 +1,21 @@
 import { NextRequest } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { GROQ_API_URL, getGroqModel } from "@/lib/ai-config";
+import { requireDbUser } from "@/lib/clerk";
+import { groqChatJson, getGroqApiKey } from "@/lib/ai/groq";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return new Response("Unauthorized", { status: 401 });
+  const user = await requireDbUser();
+  if (!user) return Response.json({ error: "Please sign in to use AI." }, { status: 401 });
 
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey || apiKey === "placeholder") {
-    return Response.json({ error: "AI service not configured" }, { status: 500 });
-  }
-  try {
-    getGroqModel();
-  } catch {
-    return Response.json({ error: "AI service not configured. Set GROQ_MODEL." }, { status: 500 });
+  if (!getGroqApiKey() && process.env.DEMO_MODE !== "true") {
+    return Response.json({ error: "AI is not configured. Set GROQ_API_KEY." }, { status: 500 });
   }
 
   try {
     const { action, resumeText, jobDescription, extra } = await req.json();
 
     let careerProfileText = "N/A";
-    const profile = await prisma.aIUserProfile.findUnique({ where: { userId } });
+    const profile = await prisma.aIUserProfile.findUnique({ where: { userId: user.id } });
     if (profile) {
       careerProfileText = JSON.stringify({
         skills: profile.skills,
@@ -69,24 +63,18 @@ export async function POST(req: NextRequest) {
     const prompt = prompts[action];
     if (!prompt) return Response.json({ error: "Unknown action" }, { status: 400 });
 
-    const response = await fetch(GROQ_API_URL, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: getGroqModel(),
-        messages: [
-          { role: "system", content: prompt.system },
-          { role: "user", content: prompt.user },
-        ],
-        temperature: 0.4,
-        max_tokens: 1024,
-      }),
+    const groq = await groqChatJson({
+      messages: [
+        { role: "system", content: prompt.system },
+        { role: "user", content: prompt.user },
+      ],
+      temperature: 0.4,
+      max_tokens: 1024,
     });
 
-    if (!response.ok) return Response.json({ error: "AI service error" }, { status: 502 });
+    if (!groq.ok) return Response.json({ error: groq.error ?? "AI service error" }, { status: groq.status });
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content ?? "";
+    const content = groq.content;
 
     // Try to parse as JSON if the action expects it
     const jsonActions = ["rewrite_bullets", "generate_achievements", "tailor_for_job", "ats_keywords", "highlight_skills"];

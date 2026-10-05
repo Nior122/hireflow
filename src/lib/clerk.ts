@@ -1,4 +1,4 @@
-'use server';
+"use server";
 
 export async function createOrGetUser() {
   const { prisma } = await import("./prisma");
@@ -40,4 +40,13 @@ export async function createOrGetUser() {
   });
 
   return user;
+}
+
+/** API/page helper: demo mode or signed-in Clerk user. Returns null if unauthenticated. */
+export async function requireDbUser() {
+  try {
+    return await createOrGetUser();
+  } catch {
+    return null;
+  }
 }

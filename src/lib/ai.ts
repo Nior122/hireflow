@@ -1,30 +1,17 @@
 import { z } from "zod";
-import { GROQ_API_URL, getGroqModel } from "@/lib/ai-config";
+import { groqChatJson } from "@/lib/ai/groq";
 
 async function groqChat(systemPrompt: string, userMessage: string): Promise<string> {
-  const response = await fetch(GROQ_API_URL, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: getGroqModel(),
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-      temperature: 0.3,
-      max_tokens: 1024,
-    }),
+  const groq = await groqChatJson({
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ],
+    temperature: 0.3,
+    max_tokens: 1024,
   });
-
-  if (!response.ok) {
-    throw new Error(`Groq API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data.choices[0]?.message?.content ?? "";
+  if (!groq.ok) throw new Error(groq.error ?? "Groq API error");
+  return groq.content;
 }
 
 const EmailClassificationSchema = z.object({

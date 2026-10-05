@@ -74,7 +74,14 @@ export function CopilotChat({ conversationId, onNewMessage }: Props) {
       });
 
       if (!res.ok) {
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: "assistant", content: "Sorry, I encountered an error. Please try again." }]);
+        let detail = "Sorry, I encountered an error. Please try again.";
+        try {
+          const data = await res.json();
+          if (typeof data.error === "string" && data.error.trim()) detail = data.error;
+        } catch {
+          /* ignore */
+        }
+        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "assistant", content: detail }]);
         setStreaming(false);
         return;
       }
