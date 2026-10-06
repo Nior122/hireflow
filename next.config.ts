@@ -43,6 +43,13 @@ const nextConfig: NextConfig = {
         { key: "Pragma", value: "no-cache" },
       ],
     },
+    // App pages are per-user and must never be replayed from a cache. Without this a
+    // browser can keep serving the HTML and RSC payload of a build that has already been
+    // replaced, which is how an old UI and old error strings survive a redeploy.
+    ...["/dashboard(.*)", "/sign-in(.*)", "/sign-up(.*)"].map((source) => ({
+      source,
+      headers: [{ key: "Cache-Control", value: "private, no-store, must-revalidate" }],
+    })),
   ],
   poweredByHeader: false,
   compress: true,
