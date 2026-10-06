@@ -2,6 +2,22 @@ import { NextRequest } from "next/server";
 import { requireDbUser } from "@/lib/clerk";
 import { groqChatJson, getGroqApiKey } from "@/lib/ai/groq";
 
+export const maxDuration = 60;
+
+function formatTranscript(value: unknown): string {
+  if (typeof value === "string") return value.trim().slice(-16_000);
+  if (!Array.isArray(value)) return "No transcript was provided.";
+
+  const lines = value.flatMap((entry: unknown) => {
+    if (!entry || typeof entry !== "object") return [];
+    const item = entry as { role?: unknown; content?: unknown };
+    if (typeof item.content !== "string" || !item.content.trim()) return [];
+    const role = typeof item.role === "string" ? item.role : "speaker";
+    return [`${role}: ${item.content.trim()}`];
+  });
+  return lines.join("\n\n").slice(-16_000) || "No transcript was provided.";
+}
+
 export async function POST(req: NextRequest) {
   const user = await requireDbUser();
   if (!user) return Response.json({ error: "Please sign in to use AI." }, { status: 401 });
@@ -11,7 +27,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { action, data } = await req.json();
+    const body = await req.json();
+    const action = typeof body?.action === "string" ? body.action : "";
+    const data = body?.data && typeof body.data === "object" ? body.data : {};
+    const transcript = formatTranscript(data.transcript ?? body.transcript);
 
     const prompts: Record<string, { system: string; user: string }> = {
       generate_question: {
@@ -38,26 +57,17 @@ export async function POST(req: NextRequest) {
         system: "You are a professional email writer. Generate a follow-up email after an interview. Return ONLY the email text, properly formatted with greeting, body, and closing.",
         user: `Type: ${data.type || "thank-you"}\nCompany: ${data.company}\nRole: ${data.role}\nInterview Notes: ${data.notes || "N/A"}\nTone: ${data.tone || "professional"}\nKey discussion points: ${data.keyPoints || "N/A"}`,
       },
+      generate_learning_report: {
+        system: "You are an interview coach. Write a concise, evidence-based learning report from the supplied mock interview transcript. Highlight demonstrated strengths, specific opportunities to improve, and a practical next-step plan. Refer to details the candidate actually gave; do not invent experience or feedback. Use clear headings and do not ask another interview question.",
+        user: `Company: ${data.company || "General"}\nRole: ${data.role || "Software Engineer"}\nJob requirements: ${data.jobRequirements || "Not provided"}\nFinal score: ${data.score ?? "Not provided"}\n\nInterview transcript:\n${transcript}`,
+      },
       mock_interview_start: {
-        system: `You are a friendly but professional AI interviewer conducting a mock interview. Start with a warm introduction and ask the first question. Be conversational. After each answer, provide brief positive feedback then ask the next question. Conduct 5 questions total. At the end, provide a comprehensive score and summary.
-
-Start with:
-"Hello! I'm your AI interview coach. I'll be conducting a mock interview today. I'll ask you a series of questions, evaluate your responses, and provide detailed feedback. Let's get started!
-
-[First question based on the role and type]"
-
-Then wait for the user's answer.`,
-        user: `Mock Interview Setup:\nCompany: ${data.company || "General"}\nRole: ${data.role || "Software Engineer"}\nType: ${data.type || "Technical"}\nDifficulty: ${data.difficulty || "Medium"}\n\nGenerate the opening and first question.`,
+        system: `You are a friendly but professional AI interviewer conducting a mock interview. Start with a warm introduction, then ask exactly one first question on its own line. Be conversational and tailor the question to the role, type, difficulty, job requirements, and career gaps. Conduct five questions total; after the fifth answer, provide a comprehensive score and summary. Do not ask multiple questions in the opening.`,
+        user: `Mock Interview Setup:\nCompany: ${data.company || "General"}\nRole: ${data.role || "Software Engineer"}\nType: ${data.type || "Technical"}\nDifficulty: ${data.difficulty || "Medium"}\nJob requirements: ${data.jobRequirements || "Not provided"}\nCareer gaps: ${data.careerGaps || "Not provided"}\n\nGive the welcome and first question.`,
       },
       mock_interview_continue: {
-        system: `You are an AI interviewer. The user just answered a question. Evaluate their answer, provide brief feedback, then ask the next question. Track the question count. On the 5th answer, provide a comprehensive final evaluation with scores.
-
-Format each response as:
-[Score feedback on previous answer]
-[Next question]
-
-On final response, provide full evaluation.`,
-        user: `Previous question: ${data.previousQuestion}\nUser's answer: ${data.answer}\nQuestion ${data.questionNumber || 1} of 5\nRole: ${data.role || "Software Engineer"}\nType: ${data.type || "Technical"}\n\nEvaluate and continue.`,
+        system: `You are an AI interviewer continuing a five-question mock interview. Read the entire transcript. Your feedback MUST address a specific detail from the candidate's latest answer, not generic praise. For answers 1 through 4, briefly evaluate that detail, then ask exactly one new, relevant question on its own line. Never repeat or paraphrase any question already present in the transcript. On answer 5, provide the final evaluation with clear scores and an overall summary, and do not ask another question.`,
+        user: `Full transcript so far:\n${transcript}\n\nMost recent question: ${data.previousQuestion || "Not provided"}\nCandidate's latest answer: ${data.answer || "Not provided"}\nQuestion ${data.questionNumber || 1} of 5\nRole: ${data.role || "Software Engineer"}\nType: ${data.type || "Technical"}\nJob requirements: ${data.jobRequirements || "Not provided"}\n\nRespond to the candidate's latest answer and continue according to the question count.`,
       },
     };
 
@@ -74,10 +84,11 @@ On final response, provide full evaluation.`,
     });
 
     if (!groq.ok) return Response.json({ error: groq.error ?? "AI error" }, { status: groq.status });
+    if (!groq.content.trim()) {
+      return Response.json({ error: "The AI provider returned an empty response. Please try again." }, { status: 502 });
+    }
 
     const content = groq.content;
-
-    // Try JSON parse
     const jsonActions = ["generate_question", "evaluate_answer", "company_research", "generate_questions", "star_coach"];
     if (jsonActions.includes(action)) {
       try {

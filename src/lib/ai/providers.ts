@@ -4,7 +4,8 @@
  */
 
 import { plainGroqReply } from "@/lib/ai/plain";
-import { groqFetch } from "@/lib/ai/groq";
+import { groqChatJson, groqFetch, largerBudgetPayload } from "@/lib/ai/groq";
+import { readOpenAICompatibleStream } from "@/lib/ai/stream";
 
 export interface AIProvider {
   id: string;
@@ -24,61 +25,63 @@ export interface ChatOptions {
   maxTokens?: number;
 }
 
+async function providerError(response: Response): Promise<string> {
+  const body = await response.text();
+  try {
+    const parsed = JSON.parse(body);
+    const error = parsed?.error;
+    if (typeof error === "string") return error;
+    if (error && typeof error.message === "string") return error.message;
+    return JSON.stringify(error ?? parsed);
+  } catch {
+    return body.trim().slice(0, 500) || "AI service error";
+  }
+}
+
 export class OpenAICompatibleProvider implements AIProvider {
   id = "configured";
   name = "Configured AI provider";
 
   async chat(messages: ChatMessage[], options?: ChatOptions): Promise<string> {
-    const response = await groqFetch({
+    const result = await groqChatJson({
       model: options?.model,
       messages,
       temperature: options?.temperature ?? 0.3,
       max_tokens: options?.maxTokens ?? 2048,
     });
 
-    if (!response.ok) throw new Error(`AI provider error: ${response.status}`);
-    const data = await response.json();
-    return plainGroqReply(data.choices?.[0]?.message?.content ?? "");
+    if (!result.ok) throw new Error(result.error ?? `AI provider error (${result.status})`);
+    if (!result.content.trim()) throw new Error("AI provider returned an empty response.");
+    return result.content;
   }
 
   async *streamChat(messages: ChatMessage[], options?: ChatOptions): AsyncGenerator<string> {
-    const response = await groqFetch({
+    const payload: Record<string, unknown> = {
       model: options?.model,
       messages,
       temperature: options?.temperature ?? 0.3,
       max_tokens: options?.maxTokens ?? 2048,
       stream: true,
-    });
+    };
 
-    if (!response.ok) throw new Error(`AI provider error: ${response.status}`);
+    let response = await groqFetch(payload);
+    if (!response.ok) throw new Error(`AI provider error (${response.status}): ${await providerError(response)}`);
+    let result = await readOpenAICompatibleStream(response.body);
 
-    const reader = response.body?.getReader();
-    if (!reader) return;
-
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let fullText = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        const data = line.slice(6).trim();
-        if (data === "[DONE]") break;
-        try {
-          const parsed = JSON.parse(data);
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) fullText += content;
-        } catch {}
+    if (!result.content.trim()) {
+      const retryPayload = largerBudgetPayload(payload);
+      if (retryPayload) {
+        response = await groqFetch(retryPayload);
+        if (!response.ok) throw new Error(`AI provider retry error (${response.status}): ${await providerError(response)}`);
+        result = await readOpenAICompatibleStream(response.body);
       }
     }
-    if (buffer.startsWith("data: ")) { try { fullText += JSON.parse(buffer.slice(6)).choices?.[0]?.delta?.content ?? ""; } catch {} }
-    if (fullText) yield plainGroqReply(fullText);
+
+    if (!result.content.trim()) {
+      const reason = result.finishReason ? ` (finish_reason: ${result.finishReason})` : "";
+      throw new Error(`AI provider returned an empty streamed response${reason}.`);
+    }
+    yield plainGroqReply(result.content);
   }
 }
 

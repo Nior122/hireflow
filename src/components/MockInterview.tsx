@@ -19,13 +19,17 @@ interface Message {
   score?: number;
 }
 
+function extractQuestionLine(content: string): string {
+  const lines = content.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  return [...lines].reverse().find(line => line.includes("?")) ?? lines[lines.length - 1] ?? content.slice(-200).trim();
+}
+
 export function MockInterview() {
   const [started, setStarted] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [questionNumber, setQuestionNumber] = useState(0);
-  const [currentQuestion, setCurrentQuestion] = useState("");
   const [lastQuestion, setLastQuestion] = useState("");
   const [scores, setScores] = useState<number[]>([]);
   const [type, setType] = useState("Technical");
@@ -72,33 +76,38 @@ export function MockInterview() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "mock_interview_start",
-          data: { 
-            type, 
-            difficulty, 
-            role: role || "Software Engineer", 
+          data: {
+            type,
+            difficulty,
+            role: role || "Software Engineer",
             company,
             jobRequirements: prepContext?.application?.notes || "",
-            careerGaps: prepContext?.careerProfile?.skills?.join(", ") || ""
+            careerGaps: prepContext?.careerProfile?.skills?.join(", ") || "",
           },
         }),
       });
       const data = await res.json();
-      const content = data.result || data.error || "Failed to start";
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Failed to start the interview.");
+      if (typeof data.result !== "string" || !data.result.trim()) throw new Error("The AI returned an empty opening question.");
+
+      const content = data.result;
+      const question = extractQuestionLine(content);
       setMessages([{ role: "assistant", content }]);
       setStarted(true);
       setQuestionNumber(1);
-      // Extract question from the response
-      const lines = content.split("\n").filter((l: string) => l.trim().length > 10);
-      setCurrentQuestion(lines[lines.length - 1] || content.slice(-200));
-      setLastQuestion(lines[lines.length - 1] || content.slice(-200));
-    } catch { toast.error("Failed to start"); }
-    setLoading(false);
+      setLastQuestion(question);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to start the interview.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function submitAnswer() {
     if (!input.trim() || loading || completed) return;
     const answer = input.trim();
-    setMessages(prev => [...prev, { role: "user", content: answer }]);
+    const transcript: Message[] = [...messages, { role: "user", content: answer }];
+    setMessages(transcript);
     setInput("");
     setLoading(true);
 
@@ -115,60 +124,81 @@ export function MockInterview() {
             role: role || "Software Engineer",
             type,
             jobRequirements: prepContext?.application?.notes || "",
+            transcript,
           },
         }),
       });
       const data = await res.json();
-      const content = data.result || "No response";
-      const isFinal = questionNumber >= 5 || content.toLowerCase().includes("final evaluation") || content.toLowerCase().includes("summary");
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "The AI could not evaluate this answer.");
+      if (typeof data.result !== "string" || !data.result.trim()) throw new Error("The AI returned an empty interview response.");
 
-      // Extract score if present
-      const scoreMatch = content.match(/overall.*?(\d+)/i);
-      const score = scoreMatch ? parseInt(scoreMatch[1]) : undefined;
-      if (score) setScores(prev => [...prev, score]);
+      const content = data.result;
+      // Completion is determined by the five-question session count, not words such as "summary" in feedback.
+      const isFinal = questionNumber >= 5;
+      const scoreMatch = content.match(/overall.*?(\d{1,3})/i);
+      const score = scoreMatch ? Number.parseInt(scoreMatch[1], 10) : undefined;
+      const updatedScores = score !== undefined && Number.isFinite(score) ? [...scores, score] : scores;
+      if (score !== undefined && Number.isFinite(score)) setScores(updatedScores);
 
       setMessages(prev => [...prev, { role: "assistant", content, score }]);
 
       if (isFinal) {
         setCompleted(true);
-        const finalScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : undefined;
-        // Save practice session
+        const finalScore = updatedScores.length > 0
+          ? Math.round(updatedScores.reduce((total, current) => total + current, 0) / updatedScores.length)
+          : undefined;
         await savePractice({
           company,
           role: role || "Software Engineer",
           category: "Mock Interview",
           difficulty,
           question: "Mock Interview Session",
-          userAnswer: messages.map(m => `${m.role}: ${m.content}`).join("\n\n") + `\n\nUser: ${answer}`,
-          aiFeedback: { messages: messages.length + 1, scores },
+          userAnswer: transcript.map(message => `${message.role}: ${message.content}`).join("\n\n"),
+          aiFeedback: { messages: transcript.length + 1, scores: updatedScores },
           score: finalScore,
-          jobApplicationId: activeJobId !== "general" ? activeJobId : undefined
+          jobApplicationId: activeJobId !== "general" ? activeJobId : undefined,
         });
         toast.success("Interview practice saved!");
-        
-        // Generate post-interview learning report if job active
+
         if (activeJobId !== "general") {
-           const reportRes = await fetch("/api/interview/ai", {
-             method: "POST",
-             headers: { "Content-Type": "application/json" },
-             body: JSON.stringify({
-               action: "generate_learning_report",
-               data: { role, company, jobRequirements: prepContext?.application?.notes || "", score: finalScore }
-             })
-           });
-           const reportData = await reportRes.json();
-           setReport(reportData.result || "Report generation failed.");
+          try {
+            const reportRes = await fetch("/api/interview/ai", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "generate_learning_report",
+                data: {
+                  role: role || "Software Engineer",
+                  company,
+                  jobRequirements: prepContext?.application?.notes || "",
+                  score: finalScore,
+                  transcript,
+                },
+              }),
+            });
+            const reportData = await reportRes.json();
+            setReport(
+              reportRes.ok && typeof reportData.result === "string"
+                ? reportData.result
+                : typeof reportData.error === "string" ? reportData.error : "Report generation failed.",
+            );
+          } catch {
+            setReport("Report generation failed. You can retry after the interview.");
+          }
         }
       } else {
-        // Extract next question
-        const lines = content.split("\n").filter((l: string) => l.trim().length > 10);
-        const q = lines[lines.length - 1] || content.slice(-200);
-        setCurrentQuestion(q);
-        setLastQuestion(q);
-        setQuestionNumber(prev => prev + 1);
+        const question = extractQuestionLine(content);
+        setLastQuestion(question);
+        setQuestionNumber(previous => previous + 1);
       }
-    } catch { setMessages(prev => [...prev, { role: "assistant", content: "Error occurred. Please try again." }]); }
-    setLoading(false);
+    } catch (error) {
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: error instanceof Error ? error.message : "Error occurred. Please try again.",
+      }]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function resetInterview() {
