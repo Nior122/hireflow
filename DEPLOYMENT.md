@@ -50,6 +50,12 @@ git rev-parse origin/master      # compare with deployment.commit
 
 Settings → **AI** shows the same information for the signed-in user plus the live model list from the provider.
 
+Both causes above are defended against in the app, without any Vercel configuration:
+
+- `/dashboard(.*)`, `/sign-in(.*)` and `/sign-up(.*)` are sent with `Cache-Control: private, no-store, must-revalidate` (`next.config.ts`), so a browser cannot replay the HTML or RSC payload of an older build after a redeploy. A hard reload is still needed once to drop whatever is already cached.
+- `src/proxy.ts` (Next 16's proxy file — there is deliberately no `src/middleware.ts`, since both files at once fail the build) redirects any production **browser navigation** that arrives on a host other than `VERCEL_PROJECT_PRODUCTION_URL` to the production origin with a 307. Previews (`VERCEL_ENV=preview`), local development, `/api/*`, `/_next/*` and static files are never redirected, so health probes and assets keep working on every URL.
+- Every dashboard page ends with a badge reading `production · <short sha> · <host>`; when the host is a pinned deployment URL of production an amber banner links to the production origin instead.
+
 ## After deploy
 
 1. Check the Vercel deployment/build logs and the preview URL, then test sign-in and database-backed dashboard with a test account.

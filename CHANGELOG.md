@@ -16,6 +16,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Browser extension reads its app origin from `VITE_HIREFLOW_APP_URL` instead of a hard-coded URL.
 
 ### Fixed
+- `/dashboard`, `/sign-in` and `/sign-up` are served with `Cache-Control: private, no-store, must-revalidate`, so a browser cannot keep replaying the HTML and RSC payload of a build that has already been replaced.
+- In production, a browser navigation that arrives on a pinned deployment URL is 307-redirected to the production origin. Previews, local development, `/api/*` and static files are never redirected.
+- Every dashboard page shows the build it is served from (`environment · <short sha> · <host>` in `DeploymentBadge`) and warns with a link to the production origin when the page came from a pinned deployment URL.
 - `getAiConfigurationStatus()` names the inferred provider even when only its key is set, so a missing model is reported as `AI_MODEL or GROQ_MODEL is not set for groq` against the right provider instead of a generic `auto` status.
 - `/api/debug/dump` required no authentication and returned raw mailbox content for every user. It is now authenticated and disabled on production deployments.
 - Browser extension pointed at `https://hireflow.vercel.app`, which is not this application.
